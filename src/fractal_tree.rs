@@ -1,9 +1,17 @@
 use bevy::prelude::*;
 use bevy::render::color::Color;
+use bevy::render::mesh;
+use bevy::render::mesh::MeshVertexAttribute;
+use bevy::render::mesh::PrimitiveTopology;
+use bevy::render::render_asset::RenderAssetUsages;
+use bevy::render::render_resource::VertexFormat;
 use std::f32::consts::PI;
 
 use bevy::sprite::MaterialMesh2dBundle;
 
+use crate::lsys_rendering::LineMaterial;
+use crate::lsys_rendering::RenderToLineList;
+use crate::LineList;
 use crate::Position;
 
 use crate::lsystems::LSysDrawer;
@@ -12,137 +20,169 @@ use crate::lsystems::LSysRules;
 
 use crate::lsystems::LSys;
 
-pub fn add_fractal_tree(mut commands: Commands) {
+pub fn add_fractal_tree(mut commands: Commands, mut materials: ResMut<Assets<LineMaterial>>) {
+    let tree = FractalTree::default();
+    let tree_handle = tree.mesh_handle.clone();
     commands
-        .spawn(FractalTree {
-            start_pos: Vec2::new(0.0, -200.0),
+        .spawn(tree)
+        .insert(LSysDrawer {
+            transform: Transform::from_translation(Vec3::new(0.0, -200.0, 0.0)),
+            color: Color::rgb(1.0, 1.0, 1.0),
+            angle: 0.0,
+            changed: true,
+        })
+        .insert(MaterialMeshBundle {
+            material: materials.add(LineMaterial::new(Color::rgb(1.0, 1.0, 1.0))),
+            mesh: tree_handle,
+            ..Default::default()
+        });
+}
+
+#[derive(Component)]
+pub(crate) struct FractalTree {
+    pub(crate) start_pos: Vec3,
+    pub(crate) start_angle: f32,
+    pub(crate) line_length: f32,
+    pub(crate) branch_color: Color,
+    pub(crate) lsys: LSys,
+    pub(crate) line_mesh: LineList,
+    mesh_handle: Handle<Mesh>,
+    material_handle: Handle<LineMaterial>,
+}
+
+impl FractalTree {
+    pub fn new(
+        start_pos: Vec3,
+        start_angle: f32,
+        line_length: f32,
+        branch_color: Color,
+        lsys: LSys,
+    ) -> Self {
+        FractalTree {
+            start_pos,
+            start_angle,
+            line_length,
+            branch_color,
+            lsys,
+            line_mesh: LineList { lines: vec![] },
+            mesh_handle: Handle::<Mesh>::default(),
+            material_handle: Handle::<LineMaterial>::default(),
+        }
+    }
+}
+
+impl Default for FractalTree {
+    fn default() -> Self {
+        let mut tmp = Self {
+            start_pos: Vec3::new(0.0, 0.0, 0.0),
             start_angle: 0.0,
-            line_length: 10.0,
-            line_width: 2.0,
+            line_length: 0.1,
             branch_color: Color::rgb(1.0, 1.0, 0.0),
-            leaf_color: Color::rgb(0.0, 1.0, 0.0),
-            leaf_radius: 5.0,
             lsys: LSys {
                 name: "fractal_tree".to_string(),
                 rules: LSysRules::new(
                     vec!['0'],
                     vec![('1', "11".to_string()), ('0', "1[0]0".to_string())],
                 ),
-                iterations: 5,
+                iterations: 2,
             },
-        })
-        .insert(LSysDrawer {
-            position: Position { x: 0.0, y: -200.0 },
-            color: Color::rgb(1.0, 1.0, 1.0),
-            angle: 0.0,
-        });
+            line_mesh: LineList { lines: vec![] },
+            mesh_handle: Handle::<Mesh>::default(),
+            material_handle: Handle::<LineMaterial>::default(),
+        };
+        tmp.line_mesh = tmp.generate_line_mesh();
+
+        tmp
+    }
 }
 
-pub(crate) fn draw_fractal_tree(
-    query: Query<(&FractalTree, &LSysDrawer)>,
+pub fn update_line_meshes(
+    mut query: Query<(Entity, &mut FractalTree, &mut LSysDrawer)>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
     mut commands: Commands,
 ) {
-    for (fractal_tree, drawer) in &query {
-        let lsys = &fractal_tree.lsys;
-        let evaluated_lsystem = lsys
-            .rules
-            .eval(&lsys.iterations)
-            .expect("fractal tree lsystem evaluation failed");
+    for (entity, mut tree, mut drawer) in &mut query {
+        if drawer.changed {
+            meshes.remove(&tree.mesh_handle);
+            tree.line_mesh = tree.generate_line_mesh();
+            let handle = meshes.add(tree.line_mesh.clone());
+            tree.mesh_handle = handle.clone();
 
-        let evaluated_lsystem = evaluated_lsystem.chars();
-        let start_pos = drawer.position.clone();
-        let mut pos = start_pos.clone();
-        let mut pos_stack: Vec<Position> = Vec::new();
-        pos_stack.push(start_pos);
-        let mut angle = drawer.angle.clone();
-        let mut angle_stack: Vec<f32> = Vec::new();
-        angle_stack.push(angle);
-        let branch_color = fractal_tree.branch_color;
-        let branch_length = fractal_tree.line_length;
-        let branch_width = fractal_tree.line_width;
-        let leaf_radius = fractal_tree.leaf_radius;
-        let leaf_color = fractal_tree.leaf_color;
-
-        for c in evaluated_lsystem {
-            match c {
-                '1' => {
-                    let new_pos = Position {
-                        x: pos.x + branch_length * -angle.sin(),
-                        y: pos.y + branch_length * angle.cos(),
-                    };
-                    let mid_pos = Position {
-                        x: (pos.x + new_pos.x) / 2.0,
-                        y: (pos.y + new_pos.y) / 2.0,
-                    };
-                    commands.spawn(MaterialMesh2dBundle {
-                        mesh: meshes
-                            .add(Rectangle::new(branch_width, branch_length))
-                            .into(),
-                        material: materials.add(fractal_tree.branch_color.clone()),
-                        transform: Transform::from_translation(Vec3::new(
-                            mid_pos.x, mid_pos.y, 0.0,
-                        ))
-                        .with_rotation(Quat::from_rotation_z(angle)),
-                        ..Default::default()
-                    });
-                    pos = new_pos;
-                }
-
-                '0' => {
-                    let new_pos = Position {
-                        x: pos.x + branch_length * -angle.sin(),
-                        y: pos.y + branch_length * angle.cos(),
-                    };
-                    let mid_pos = Position {
-                        x: (pos.x + new_pos.x) / 2.0,
-                        y: (pos.y + new_pos.y) / 2.0,
-                    };
-                    commands.spawn(MaterialMesh2dBundle {
-                        mesh: meshes
-                            .add(Rectangle::new(branch_width, branch_length))
-                            .into(),
-                        material: materials.add(fractal_tree.branch_color.clone()),
-                        transform: Transform::from_translation(Vec3::new(
-                            mid_pos.x, mid_pos.y, 0.0,
-                        ))
-                        .with_rotation(Quat::from_rotation_z(angle)),
-                        ..Default::default()
-                    });
-                    commands.spawn(MaterialMesh2dBundle {
-                        mesh: meshes.add(Circle::new(leaf_radius)).into(),
-                        material: materials.add(leaf_color.clone()),
-                        transform: Transform::from_translation(Vec3::new(
-                            new_pos.x, new_pos.y, 0.0,
-                        )),
-                        ..Default::default()
-                    });
-                }
-                '[' => {
-                    pos_stack.push(pos.clone());
-                    angle_stack.push(angle);
-                    angle -= std::f32::consts::PI / 4.0;
-                }
-                ']' => {
-                    pos = pos_stack.pop().unwrap();
-                    angle = angle_stack.pop().unwrap();
-                    angle += std::f32::consts::PI / 4.0;
-                }
-                _ => (),
-            }
+            commands.entity(entity).insert(MaterialMeshBundle {
+                material: tree.material_handle.clone(),
+                mesh: handle,
+                ..Default::default()
+            });
+            drawer.changed = false;
         }
     }
 }
 
-#[derive(Component)]
-pub(crate) struct FractalTree {
-    pub(crate) start_pos: Vec2,
-    pub(crate) start_angle: f32,
-    pub(crate) line_length: f32,
-    pub(crate) line_width: f32,
-    pub(crate) branch_color: Color,
-    pub(crate) leaf_color: Color,
-    pub(crate) leaf_radius: f32,
-    pub(crate) lsys: LSys,
+pub fn update_tree_materials(
+    mut query: Query<(&mut FractalTree, &mut LSysDrawer)>,
+    mut materials: ResMut<Assets<LineMaterial>>,
+) {
+    for (mut tree, mut drawer) in &mut query {
+        if tree.material_handle == Handle::<LineMaterial>::default() || drawer.changed {
+            let old_handle = tree.material_handle.clone();
+            tree.material_handle =
+                dbg!(materials.add(LineMaterial::new(tree.branch_color)).clone());
+            materials.remove(&old_handle);
+        }
+    }
+}
+
+impl RenderToLineList for FractalTree {
+    fn generate_line_mesh(&self) -> LineList {
+        let mut line_list = LineList { lines: vec![] };
+        let start_pos = self.start_pos;
+        let mut v_pos = vec![start_pos];
+        let iterations = self.lsys.iterations;
+
+        let evaluated_lsystem = self.lsys.rules.eval(&iterations).unwrap();
+        let mut pos = start_pos;
+        let mut pos_stack: Vec<Vec3> = Vec::new();
+        pos_stack.push(start_pos);
+        let mut angle = self.start_angle;
+        let mut angle_stack: Vec<f32> = Vec::new();
+        angle_stack.push(angle);
+        let branch_length = self.line_length;
+        let branch_color = self.branch_color;
+
+        for c in evaluated_lsystem.chars() {
+            match c {
+                '1' => {
+                    let new_pos = Vec3::new(
+                        pos.x + branch_length * -angle.sin(),
+                        pos.y + branch_length * angle.cos(),
+                        0.0,
+                    );
+                    line_list.lines.push((pos, new_pos));
+
+                    pos = new_pos;
+                }
+                '0' => {
+                    let new_pos = Vec3::new(
+                        pos.x + branch_length * -angle.sin(),
+                        pos.y + branch_length * angle.cos(),
+                        0.0,
+                    );
+                    line_list.lines.push((pos, new_pos));
+                }
+                '[' => {
+                    pos_stack.push(pos);
+                    angle_stack.push(angle);
+                    angle -= PI / 4.0;
+                }
+                ']' => {
+                    pos = pos_stack.pop().unwrap();
+                    v_pos.push(pos);
+                    angle = angle_stack.pop().unwrap() + PI / 4.0;
+                }
+                _ => {}
+            }
+        }
+
+        dbg!(line_list)
+    }
 }

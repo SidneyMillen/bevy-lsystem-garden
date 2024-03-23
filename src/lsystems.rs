@@ -1,8 +1,15 @@
+use std::f32::consts::PI;
+
 use bevy::prelude::*;
 use bevy::render::color::Color;
+use bevy::render::mesh::MeshVertexAttribute;
+use bevy::render::mesh::PrimitiveTopology;
+use bevy::render::render_asset::RenderAssetUsages;
 use lsystem::LSystem;
 
 use lsystem::MapRules;
+
+use crate::fractal_tree::FractalTree;
 
 use super::Position;
 
@@ -15,9 +22,10 @@ pub(crate) struct LSys {
 
 #[derive(Component)]
 pub(crate) struct LSysDrawer {
-    pub(crate) position: Position,
+    pub(crate) transform: Transform,
     pub(crate) color: Color,
     pub(crate) angle: f32,
+    pub(crate) changed: bool,
 }
 
 #[derive(Component)]
@@ -35,6 +43,7 @@ impl LSysRules {
     pub fn new(axiom: Vec<char>, rules: Vec<(char, String)>) -> Self {
         Self { axiom, rules }
     }
+
     pub(crate) fn as_map_rules(&self) -> MapRules<char> {
         let mut map_rules = MapRules::new();
         for (k, v) in &self.rules {
@@ -52,5 +61,16 @@ impl LSysRules {
             .into_iter()
             .collect();
         Ok(output)
+    }
+}
+
+impl LSysDrawer {
+    pub(crate) fn new(transform: Transform, color: Color, angle: f32) -> Self {
+        Self {
+            transform,
+            color,
+            angle,
+            changed: true,
+        }
     }
 }
