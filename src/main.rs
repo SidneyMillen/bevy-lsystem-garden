@@ -15,7 +15,8 @@ use bevy::{
 };
 use bevy_egui::{egui, systems::InputResources, EguiContext, EguiContexts, EguiPlugin, EguiSet};
 use bevy_flycam::prelude::*;
-use fractal_plant::{add_fractal_tree, FractalPlant};
+use fractal_plant::{add_fractal_plant, FractalPlant};
+use hilbert_curve::add_default_hilbert_curve;
 use lsys_egui::{test_side_and_top_panel, PanelOccupiedScreenSpace};
 use lsys_rendering::LineMaterial;
 use lsystems::LSysDrawer;
@@ -24,6 +25,7 @@ use crate::lsys_rendering::RenderToLineList;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 mod fractal_plant;
+mod hilbert_curve;
 mod lsys_egui;
 mod lsys_rendering;
 mod lsystems;
@@ -47,7 +49,14 @@ fn main() {
         })
         //.add_plugins(EguiPlugin)
         .init_resource::<PanelOccupiedScreenSpace>()
-        .add_systems(Startup, (add_fractal_tree, setup_camera))
+        .add_systems(
+            Startup,
+            (
+                //add_default_hilbert_curve,
+                add_fractal_plant,
+                setup_camera,
+            ),
+        )
         .add_systems(
             PreUpdate,
             (
@@ -59,9 +68,11 @@ fn main() {
         .add_systems(
             Update,
             (
-                fractal_plant::update_line_meshes,
-                fractal_plant::update_tree_materials,
-                rotate_all_drawers_towards_camera.after(fractal_plant::update_tree_materials),
+                hilbert_curve::update_curve_materials,
+                hilbert_curve::update_line_meshes.after(hilbert_curve::update_curve_materials),
+                fractal_plant::update_plant_materials,
+                fractal_plant::update_line_meshes.after(fractal_plant::update_plant_materials),
+                rotate_all_drawers_towards_camera.after(fractal_plant::update_line_meshes),
                 process_input_for_flycam,
             ),
         )

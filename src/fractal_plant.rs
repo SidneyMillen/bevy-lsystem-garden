@@ -21,7 +21,7 @@ use crate::lsystems::LSysRules;
 
 use crate::lsystems::LSys;
 
-pub fn add_fractal_tree(mut commands: Commands, mut materials: ResMut<Assets<LineMaterial>>) {
+pub fn add_fractal_plant(mut commands: Commands, mut materials: ResMut<Assets<LineMaterial>>) {
     let tree = FractalPlant::default();
     let tree_handle = tree.mesh_handle.clone();
     commands
@@ -120,7 +120,7 @@ pub fn update_line_meshes(
     }
 }
 
-pub fn update_tree_materials(
+pub fn update_plant_materials(
     mut query: Query<(&mut FractalPlant, &mut LSysDrawer)>,
     mut materials: ResMut<Assets<LineMaterial>>,
 ) {
