@@ -15,6 +15,7 @@ use bevy::{
 };
 use bevy_egui::{egui, systems::InputResources, EguiContext, EguiContexts, EguiPlugin, EguiSet};
 use bevy_flycam::prelude::*;
+use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use fractal_plant::{add_fractal_plant, FractalPlant};
 use hilbert_curve::add_default_hilbert_curve;
 use lsys_egui::{test_side_and_top_panel, PanelOccupiedScreenSpace};
@@ -35,9 +36,10 @@ const CAMERA_TARGET: Vec3 = Vec3::ZERO;
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins, MaterialPlugin::<LineMaterial>::default()))
-        .add_plugins(NoCameraPlayerPlugin)
+        //.add_plugins(NoCameraPlayerPlugin)
         .add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin) // adds default options and `InspectorEguiImpl`s
         .add_plugins(EguiPlugin)
+        .add_plugins(PanOrbitCameraPlugin)
         .insert_resource(MovementSettings {
             sensitivity: 0.00015, // default: 0.00012
             speed: 12.0,          // default: 12.0
@@ -72,7 +74,7 @@ fn main() {
                 hilbert_curve::update_line_meshes.after(hilbert_curve::update_curve_materials),
                 fractal_plant::update_plant_materials,
                 fractal_plant::update_line_meshes.after(fractal_plant::update_plant_materials),
-                rotate_all_drawers_towards_camera.after(fractal_plant::update_line_meshes),
+                //    rotate_all_drawers_towards_camera.after(fractal_plant::update_line_meshes),
                 process_input_for_flycam,
             ),
         )
@@ -118,7 +120,7 @@ fn setup_camera(mut commands: Commands) {
             transform: camera_transform,
             ..default()
         })
-        .insert(FlyCam);
+        .insert(PanOrbitCamera::default());
 }
 
 fn reset_camera_position(
@@ -216,8 +218,8 @@ impl From<LineStrip> for Mesh {
 }
 
 fn rotate_all_drawers_towards_camera(
-    camera_query: Query<&Transform, With<FlyCam>>,
-    mut tree_query: Query<(&mut Transform, &FractalPlant), Without<FlyCam>>,
+    camera_query: Query<&Transform, With<PanOrbitCamera>>,
+    mut tree_query: Query<(&mut Transform, &FractalPlant), Without<PanOrbitCamera>>,
 ) {
     let camera_transform = camera_query.single();
     for (mut transform, _) in &mut tree_query {
