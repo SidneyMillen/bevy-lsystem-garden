@@ -14,6 +14,7 @@ use bevy::{
     },
 };
 
+use crate::fractal_plant::FractalPlant;
 use crate::LineList;
 
 pub trait RenderToLineList {

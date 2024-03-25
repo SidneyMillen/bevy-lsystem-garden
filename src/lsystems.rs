@@ -9,7 +9,8 @@ use lsystem::LSystem;
 
 use lsystem::MapRules;
 
-use crate::fractal_tree::FractalTree;
+use crate::fractal_plant::FractalPlant;
+use crate::lsys_rendering::RenderToLineList;
 
 #[derive(Component)]
 pub(crate) struct LSys {
@@ -20,9 +21,6 @@ pub(crate) struct LSys {
 
 #[derive(Component)]
 pub(crate) struct LSysDrawer {
-    pub(crate) transform: Transform,
-    pub(crate) color: Color,
-    pub(crate) angle: f32,
     pub(crate) changed: bool,
 }
 
@@ -63,15 +61,13 @@ impl LSysRules {
 }
 
 impl LSysDrawer {
-    pub(crate) fn new(transform: Transform, color: Color, angle: f32) -> Self {
-        Self {
-            transform,
-            color,
-            angle,
-            changed: true,
-        }
+    pub(crate) fn new() -> Self {
+        Self { changed: true }
     }
-    pub(crate) fn update_facing(&mut self, looking_at: &Vec3) {
-        self.transform = self.transform.looking_at(looking_at.clone(), Vec3::Y);
-    }
+}
+
+pub struct OLSystem<T: RenderToLineList> {
+    pub(crate) lsys: LSys,
+    pub(crate) drawer: LSysDrawer,
+    pub(crate) renderable: T,
 }

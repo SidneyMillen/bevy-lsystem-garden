@@ -7,22 +7,23 @@ use bevy::{
         mesh::{shape::Quad, PrimitiveTopology},
         render_asset::RenderAssetUsages,
         settings::{Backends, RenderCreation, WgpuSettings},
+        view::VisibilitySystems,
         RenderPlugin,
     },
     sprite::MaterialMesh2dBundle,
     window::PrimaryWindow,
 };
-use bevy_egui::{egui, systems::InputResources, EguiContext, EguiContexts, EguiPlugin};
+use bevy_egui::{egui, systems::InputResources, EguiContext, EguiContexts, EguiPlugin, EguiSet};
 use bevy_flycam::prelude::*;
-use fractal_tree::{add_fractal_tree, FractalTree};
-use lsys_egui::{fractal_tree_ui, test_side_and_top_panel, PanelOccupiedScreenSpace};
+use fractal_plant::{add_fractal_tree, FractalPlant};
+use lsys_egui::{test_side_and_top_panel, PanelOccupiedScreenSpace};
 use lsys_rendering::LineMaterial;
 use lsystems::LSysDrawer;
 
 use crate::lsys_rendering::RenderToLineList;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
-mod fractal_tree;
+mod fractal_plant;
 mod lsys_egui;
 mod lsys_rendering;
 mod lsystems;
@@ -47,13 +48,20 @@ fn main() {
         //.add_plugins(EguiPlugin)
         .init_resource::<PanelOccupiedScreenSpace>()
         .add_systems(Startup, (add_fractal_tree, setup_camera))
-        .add_systems(Update, (test_side_and_top_panel, inspector_ui))
+        .add_systems(
+            PreUpdate,
+            (
+                test_side_and_top_panel,
+                inspector_ui.after(test_side_and_top_panel),
+            )
+                .after(EguiSet::BeginFrame),
+        )
         .add_systems(
             Update,
             (
-                fractal_tree::update_line_meshes,
-                fractal_tree::update_tree_materials,
-                rotate_all_drawers_towards_camera,
+                fractal_plant::update_line_meshes,
+                fractal_plant::update_tree_materials,
+                rotate_all_drawers_towards_camera.after(fractal_plant::update_tree_materials),
                 process_input_for_flycam,
             ),
         )
@@ -156,15 +164,6 @@ fn process_input_for_flycam(
     }
 }
 
-fn move_drawn_tree_system(mut query: Query<(&mut LSysDrawer)>, time: Res<Time>) {
-    for mut drawer in &mut query {
-        drawer.transform.translation.x += time.delta_seconds() * 10.0;
-        drawer.transform.translation.y += time.delta_seconds() * 10.0;
-    }
-}
-
-struct tree_marker {}
-
 /// A list of lines with a start and end position
 #[derive(Debug, Clone)]
 struct LineList {
@@ -207,7 +206,7 @@ impl From<LineStrip> for Mesh {
 
 fn rotate_all_drawers_towards_camera(
     camera_query: Query<&Transform, With<FlyCam>>,
-    mut tree_query: Query<(&mut Transform, &FractalTree), Without<FlyCam>>,
+    mut tree_query: Query<(&mut Transform, &FractalPlant), Without<FlyCam>>,
 ) {
     let camera_transform = camera_query.single();
     for (mut transform, _) in &mut tree_query {

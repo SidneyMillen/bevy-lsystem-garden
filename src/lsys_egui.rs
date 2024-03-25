@@ -5,7 +5,7 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiUserTextures};
 
-use crate::{fractal_tree::FractalTree, lsystems::LSysDrawer};
+use crate::{fractal_plant::FractalPlant, lsystems::LSysDrawer};
 
 #[derive(Default, Resource)]
 pub struct PanelOccupiedScreenSpace {
@@ -15,16 +15,14 @@ pub struct PanelOccupiedScreenSpace {
     pub bottom: f32,
 }
 
-pub fn fractal_tree_ui(mut contexts: EguiContexts) {
-    egui::Window::new("Fractal Tree").show(contexts.ctx_mut(), |ui| {
-        ui.label("Fractal Tree");
-    });
+pub trait SideMenuOptions {
+    fn side_menu_options(&mut self, drawer: &mut LSysDrawer, ui: &mut egui::Ui);
 }
 
 pub fn test_side_and_top_panel(
     mut contexts: EguiContexts,
     mut occupied_space: ResMut<PanelOccupiedScreenSpace>,
-    mut query: Query<(&mut FractalTree, &mut LSysDrawer)>,
+    mut query: Query<(&mut FractalPlant, &mut LSysDrawer)>,
 ) {
     occupied_space.top = egui::TopBottomPanel::top("top_panel")
         .resizable(true)
@@ -40,40 +38,8 @@ pub fn test_side_and_top_panel(
         .show(contexts.ctx_mut(), |ui| {
             ui.label("Side Panel");
 
-            for (mut fractal_tree, mut lsys_drawer) in query.iter_mut() {
-                let old_start_pos = fractal_tree.start_pos;
-                ui.horizontal(|ui| {
-                    ui.label("Start Position");
-                    ui.add(egui::Slider::new(&mut fractal_tree.start_pos.x, -0.5..=0.5));
-                });
-
-                let old_start_angle = fractal_tree.start_angle;
-                ui.horizontal(|ui| {
-                    ui.label("Start Angle");
-                    ui.add(egui::Slider::new(
-                        &mut fractal_tree.start_angle,
-                        std::f32::consts::PI..=std::f32::consts::PI * -1.0,
-                    ));
-                });
-
-                let old_line_length = fractal_tree.line_length;
-                ui.horizontal(|ui| {
-                    ui.label("Line Length");
-                    ui.add(egui::Slider::new(&mut fractal_tree.line_length, 0.0..=1.0));
-                });
-
-                let old_iterations = fractal_tree.lsys.iterations;
-                ui.horizontal(|ui| {
-                    ui.label("Iterations");
-                    ui.add(egui::Slider::new(&mut fractal_tree.lsys.iterations, 0..=10));
-                });
-                if old_start_pos != fractal_tree.start_pos
-                    || old_start_angle != fractal_tree.start_angle
-                    || old_line_length != fractal_tree.line_length
-                    || old_iterations != fractal_tree.lsys.iterations
-                {
-                    lsys_drawer.changed = true;
-                }
+            for (mut tree, mut drawer) in &mut query {
+                tree.side_menu_options(&mut drawer, ui);
             }
 
             ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
