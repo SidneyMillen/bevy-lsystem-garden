@@ -12,7 +12,6 @@ use bevy::sprite::MaterialMesh2dBundle;
 use crate::lsys_rendering::LineMaterial;
 use crate::lsys_rendering::RenderToLineList;
 use crate::LineList;
-use crate::Position;
 
 use crate::lsystems::LSysDrawer;
 

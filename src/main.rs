@@ -1,5 +1,8 @@
 use bevy::{
+    asset::processor::ErasedProcessor,
+    pbr::MaterialExtension,
     prelude::*,
+    reflect::DynamicTypePath,
     render::{
         mesh::{shape::Quad, PrimitiveTopology},
         render_asset::RenderAssetUsages,
@@ -9,13 +12,15 @@ use bevy::{
     sprite::MaterialMesh2dBundle,
     window::PrimaryWindow,
 };
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_egui::{egui, systems::InputResources, EguiContext, EguiContexts, EguiPlugin};
+use bevy_flycam::prelude::*;
 use fractal_tree::{add_fractal_tree, FractalTree};
 use lsys_egui::{fractal_tree_ui, test_side_and_top_panel, PanelOccupiedScreenSpace};
 use lsys_rendering::LineMaterial;
 use lsystems::LSysDrawer;
 
 use crate::lsys_rendering::RenderToLineList;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 mod fractal_tree;
 mod lsys_egui;
@@ -27,19 +32,56 @@ const CAMERA_TARGET: Vec3 = Vec3::ZERO;
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins, MaterialPlugin::<LineMaterial>::default()))
+        .add_plugins(NoCameraPlayerPlugin)
+        .add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin) // adds default options and `InspectorEguiImpl`s
         .add_plugins(EguiPlugin)
+        .insert_resource(MovementSettings {
+            sensitivity: 0.00015, // default: 0.00012
+            speed: 12.0,          // default: 12.0
+        })
+        .insert_resource(KeyBindings {
+            move_ascend: KeyCode::KeyE,
+            move_descend: KeyCode::KeyQ,
+            ..Default::default()
+        })
+        //.add_plugins(EguiPlugin)
         .init_resource::<PanelOccupiedScreenSpace>()
-        .add_systems(Startup, (setup_camera, add_fractal_tree))
-        .add_systems(Update, test_side_and_top_panel)
-        .add_systems(Update, update_camera_transform_system)
+        .add_systems(Startup, (add_fractal_tree, setup_camera))
+        .add_systems(Update, (test_side_and_top_panel, inspector_ui))
         .add_systems(
             Update,
             (
                 fractal_tree::update_line_meshes,
                 fractal_tree::update_tree_materials,
+                rotate_all_drawers_towards_camera,
+                process_input_for_flycam,
             ),
         )
         .run();
+}
+
+fn inspector_ui(world: &mut World) {
+    let Ok(egui_context) = world
+        .query_filtered::<&mut EguiContext, With<PrimaryWindow>>()
+        .get_single(world)
+    else {
+        return;
+    };
+    let mut egui_context = egui_context.clone();
+
+    egui::Window::new("UI").show(egui_context.get_mut(), |ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            // equivalent to `WorldInspectorPlugin`
+            bevy_inspector_egui::bevy_inspector::ui_for_world(world, ui);
+
+            egui::CollapsingHeader::new("Materials").show(ui, |ui| {
+                bevy_inspector_egui::bevy_inspector::ui_for_assets::<StandardMaterial>(world, ui);
+            });
+
+            ui.heading("Entities");
+            bevy_inspector_egui::bevy_inspector::ui_for_world_entities(world, ui);
+        });
+    });
 }
 
 #[derive(Resource, Deref, DerefMut)]
@@ -52,10 +94,24 @@ fn setup_camera(mut commands: Commands) {
 
     commands.insert_resource(OriginalCameraTransform(camera_transform.clone()));
 
-    commands.spawn(Camera3dBundle {
-        transform: camera_transform,
-        ..default()
-    });
+    commands
+        .spawn(Camera3dBundle {
+            transform: camera_transform,
+            ..default()
+        })
+        .insert(FlyCam);
+}
+
+fn reset_camera_position(
+    mut commands: Commands,
+    original_camera_transform: Res<OriginalCameraTransform>,
+    mut camera_query: Query<&mut Transform, With<FlyCam>>,
+) {
+    let original_camera_transform = original_camera_transform.0.clone();
+
+    for mut transform in &mut camera_query {
+        *transform = original_camera_transform.clone();
+    }
 }
 
 fn update_camera_transform_system(
@@ -87,10 +143,17 @@ fn update_camera_transform_system(
         ));
 }
 
-#[derive(Component, Clone, Debug)]
-struct Position {
-    x: f32,
-    y: f32,
+fn process_input_for_flycam(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut query: Query<(&Camera3d, &mut Transform), With<FlyCam>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::KeyR) {
+        for (_, mut transform) in &mut query {
+            transform.translation = Vec3::new(0.0, 0.0, 5.0);
+
+            transform.look_at(CAMERA_TARGET, Vec3::Y);
+        }
+    }
 }
 
 fn move_drawn_tree_system(mut query: Query<(&mut LSysDrawer)>, time: Res<Time>) {
@@ -139,5 +202,26 @@ impl From<LineStrip> for Mesh {
         )
         // Add the point positions as an attribute
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, line.points)
+    }
+}
+
+fn rotate_all_drawers_towards_camera(
+    camera_query: Query<&Transform, With<FlyCam>>,
+    mut tree_query: Query<(&mut Transform, &FractalTree), Without<FlyCam>>,
+) {
+    let camera_transform = camera_query.single();
+    for (mut transform, _) in &mut tree_query {
+        let facing = transform
+            .clone()
+            .looking_at(
+                Vec3::new(
+                    camera_transform.translation.x,
+                    transform.translation.y,
+                    camera_transform.translation.z,
+                ),
+                Vec3::Y,
+            )
+            .rotation;
+        transform.rotation = facing;
     }
 }

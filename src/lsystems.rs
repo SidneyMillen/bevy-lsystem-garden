@@ -11,8 +11,6 @@ use lsystem::MapRules;
 
 use crate::fractal_tree::FractalTree;
 
-use super::Position;
-
 #[derive(Component)]
 pub(crate) struct LSys {
     pub(crate) name: String,
@@ -72,5 +70,8 @@ impl LSysDrawer {
             angle,
             changed: true,
         }
+    }
+    pub(crate) fn update_facing(&mut self, looking_at: &Vec3) {
+        self.transform = self.transform.looking_at(looking_at.clone(), Vec3::Y);
     }
 }
