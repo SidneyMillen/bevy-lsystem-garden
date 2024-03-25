@@ -18,5 +18,7 @@ debug = false
 
 [dependencies]
 bevy = { version = "0.13.1", features = ["wayland", "dynamic_linking"] }
+bevy-inspector-egui = "0.23.4"
 bevy_egui = "0.26.0"
+bevy_flycam = "0.13.0"
 lsystem = "0.2.1"
