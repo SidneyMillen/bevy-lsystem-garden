@@ -144,9 +144,9 @@ impl RenderToLineList for FractalPlant {
         let mut pos = start_pos;
         let mut pos_stack: Vec<Vec3> = Vec::new();
         pos_stack.push(start_pos);
-        let mut angle = self.start_angle;
-        let mut angle_stack: Vec<f32> = Vec::new();
-        angle_stack.push(angle);
+        let mut heading: Quat = Quat::from_rotation_z(self.start_angle);
+        let mut angle_stack: Vec<Quat> = Vec::new();
+        angle_stack.push(heading);
         let branch_length = self.line_length;
 
         let evaluated_lsystem = self.lsys.rules.eval(&iterations).unwrap_or("".to_string());
@@ -154,37 +154,35 @@ impl RenderToLineList for FractalPlant {
         for c in evaluated_lsystem.chars() {
             match c {
                 '1' => {
-                    let new_pos = Vec3::new(
-                        pos.x + branch_length * -angle.sin(),
-                        pos.y + branch_length * angle.cos(),
-                        0.0,
-                    );
+                    let new_pos = heading.mul_vec3(Vec3::new(0.0, branch_length, 0.0)) + pos;
                     line_list.lines.push((pos, new_pos));
 
                     pos = new_pos;
                 }
                 '0' => {
-                    let new_pos = Vec3::new(
-                        pos.x + branch_length * -angle.sin(),
-                        pos.y + branch_length * angle.cos(),
-                        0.0,
-                    );
+                    let new_pos = heading.mul_vec3(Vec3::new(0.0, branch_length, 0.0)) + pos;
                     line_list.lines.push((pos, new_pos));
                 }
                 '[' => {
                     pos_stack.push(pos);
-                    angle_stack.push(angle);
+                    angle_stack.push(heading);
                 }
                 '-' => {
-                    angle -= self.turn_angle;
+                    heading *= Quat::from_rotation_z(-self.turn_angle);
                 }
                 '+' => {
-                    angle += self.turn_angle;
+                    heading *= Quat::from_rotation_z(self.turn_angle);
+                }
+                '<' => {
+                    heading *= Quat::from_rotation_x(-self.turn_angle);
+                }
+                '>' => {
+                    heading *= Quat::from_rotation_x(self.turn_angle);
                 }
                 ']' => {
                     pos = pos_stack.pop().unwrap_or(pos);
                     v_pos.push(pos);
-                    angle = angle_stack.pop().unwrap_or(angle);
+                    heading = angle_stack.pop().unwrap_or(heading);
                 }
                 _ => {}
             }

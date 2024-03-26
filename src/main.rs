@@ -120,7 +120,12 @@ fn setup_camera(mut commands: Commands) {
             transform: camera_transform,
             ..default()
         })
-        .insert(PanOrbitCamera::default());
+        .insert(PanOrbitCamera {
+            button_orbit: MouseButton::Middle,
+            button_pan: MouseButton::Middle,
+            modifier_pan: Some(KeyCode::ShiftLeft),
+            ..Default::default()
+        });
 }
 
 fn reset_camera_position(
