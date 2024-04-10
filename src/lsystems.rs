@@ -65,9 +65,3 @@ impl LSysDrawer {
         Self { changed: true }
     }
 }
-
-pub struct OLSystem<T: RenderToLineList> {
-    pub(crate) lsys: LSys,
-    pub(crate) drawer: LSysDrawer,
-    pub(crate) renderable: T,
-}
