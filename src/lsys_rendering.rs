@@ -13,6 +13,7 @@ use bevy::{
         },
     },
 };
+use serde::{Deserialize, Serialize};
 
 use crate::fractal_plant::FractalPlant;
 use crate::LineList;
@@ -21,7 +22,7 @@ pub trait RenderToLineList {
     fn generate_line_mesh(&self) -> LineList;
 }
 
-#[derive(Asset, TypePath, Default, AsBindGroup, Debug, Clone)]
+#[derive(Asset, TypePath, Default, AsBindGroup, Debug, Clone, Serialize, Deserialize)]
 pub struct LineMaterial {
     #[uniform(0)]
     color: Color,

@@ -1,10 +1,8 @@
 use bevy::prelude::*;
 use bevy::render::color::Color;
-use bevy::render::mesh;
-use bevy::render::mesh::MeshVertexAttribute;
-use bevy::render::mesh::PrimitiveTopology;
-use bevy::render::render_asset::RenderAssetUsages;
-use bevy::render::render_resource::VertexFormat;
+
+use serde::{Deserialize, Serialize};
+
 use bevy_egui::egui::Color32;
 use std::f32::consts::PI;
 
@@ -34,7 +32,7 @@ pub fn add_fractal_plant(mut commands: Commands, mut materials: ResMut<Assets<Li
         });
 }
 
-#[derive(Component)]
+#[derive(Component, Serialize, Deserialize, Debug)]
 pub(crate) struct FractalPlant {
     pub(crate) start_pos: Vec3,
     pub(crate) start_angle: f32,
@@ -42,8 +40,11 @@ pub(crate) struct FractalPlant {
     pub(crate) line_length: f32,
     pub(crate) branch_color: Color,
     pub(crate) lsys: LSys,
+    #[serde(skip_serializing, skip_deserializing)]
     pub(crate) line_mesh: LineList,
+    #[serde(skip_serializing, skip_deserializing)]
     mesh_handle: Handle<Mesh>,
+    #[serde(skip_serializing, skip_deserializing)]
     material_handle: Handle<LineMaterial>,
 }
 

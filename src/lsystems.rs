@@ -7,24 +7,27 @@ use bevy::render::mesh::PrimitiveTopology;
 use bevy::render::render_asset::RenderAssetUsages;
 use lsystem::LSystem;
 
+use serde::{Deserialize, Serialize};
+
 use lsystem::MapRules;
 
 use crate::fractal_plant::FractalPlant;
 use crate::lsys_rendering::RenderToLineList;
 
-#[derive(Component)]
+#[derive(Component, Debug, Serialize, Deserialize)]
 pub(crate) struct LSys {
     pub(crate) name: String,
     pub(crate) rules: LSysRules,
     pub(crate) iterations: usize,
 }
 
-#[derive(Component)]
+#[derive(Component, Debug, Serialize, Deserialize)]
 pub(crate) struct LSysDrawer {
     pub(crate) changed: bool,
 }
 
-#[derive(Component)]
+#[derive(Component, Debug, Serialize, Deserialize)]
+
 pub(crate) struct LSysRules {
     pub(crate) axiom: Vec<char>,
     pub(crate) rules: Vec<(char, String)>,

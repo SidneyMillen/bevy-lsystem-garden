@@ -1,8 +1,5 @@
 use bevy::{
-    asset::processor::ErasedProcessor,
-    pbr::MaterialExtension,
     prelude::*,
-    reflect::DynamicTypePath,
     render::{
         mesh::{shape::Quad, PrimitiveTopology},
         render_asset::RenderAssetUsages,
@@ -10,21 +7,20 @@ use bevy::{
         view::VisibilitySystems,
         RenderPlugin,
     },
-    sprite::MaterialMesh2dBundle,
-    window::PrimaryWindow,
 };
+
 use bevy_egui::{egui, systems::InputResources, EguiContext, EguiContexts, EguiPlugin, EguiSet};
 use bevy_flycam::prelude::*;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use camera::{process_input_for_cam, setup_camera};
 use fractal_plant::{add_fractal_plant, FractalPlant};
-use hilbert_curve::add_default_hilbert_curve;
 use lsys_egui::{inspector_ui, test_side_and_top_panel, PanelOccupiedScreenSpace};
 use lsys_rendering::LineMaterial;
-use lsystems::LSysDrawer;
+use std::path::Path;
 
-use crate::lsys_rendering::RenderToLineList;
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use save_load::serialize_to_file;
+
+use serde::{Deserialize, Serialize};
 
 mod camera;
 mod fractal_plant;
@@ -32,6 +28,7 @@ mod hilbert_curve;
 mod lsys_egui;
 mod lsys_rendering;
 mod lsystems;
+mod save_load;
 
 fn main() {
     App::new()
@@ -62,17 +59,19 @@ fn main() {
         .add_systems(
             Update,
             (
+                process_input_for_cam,
                 hilbert_curve::update_curve_materials,
                 hilbert_curve::update_line_meshes.after(hilbert_curve::update_curve_materials),
                 fractal_plant::update_plant_materials,
                 fractal_plant::update_line_meshes.after(fractal_plant::update_plant_materials),
+                test_serialize,
             ),
         )
         .run();
 }
 
 /// A list of lines with a start and end position
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct LineList {
     lines: Vec<(Vec3, Vec3)>,
 }
@@ -93,7 +92,7 @@ impl From<LineList> for Mesh {
 }
 
 /// A list of points that will have a line drawn between each consecutive points
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct LineStrip {
     points: Vec<Vec3>,
 }
@@ -108,5 +107,11 @@ impl From<LineStrip> for Mesh {
         )
         // Add the point positions as an attribute
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, line.points)
+    }
+}
+
+fn test_serialize(mut query: Query<(&FractalPlant)>) {
+    for tree in query.iter() {
+        serialize_to_file(tree)
     }
 }
