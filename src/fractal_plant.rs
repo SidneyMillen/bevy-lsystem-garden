@@ -11,6 +11,7 @@ use bevy::sprite::MaterialMesh2dBundle;
 use crate::lsys_egui::SideMenuOptions;
 use crate::lsys_rendering::LineMaterial;
 use crate::lsys_rendering::RenderToLineList;
+use crate::save_load;
 use crate::LineList;
 
 use crate::lsystems::LSysDrawer;
@@ -32,7 +33,7 @@ pub fn add_fractal_plant(mut commands: Commands, mut materials: ResMut<Assets<Li
         });
 }
 
-#[derive(Component, Serialize, Deserialize, Debug)]
+#[derive(Component, Serialize, DeserializeOwned, Debug)]
 pub(crate) struct FractalPlant {
     pub(crate) start_pos: Vec3,
     pub(crate) start_angle: f32,
@@ -128,8 +129,7 @@ pub fn update_plant_materials(
     for (mut tree, drawer) in &mut query {
         if tree.material_handle == Handle::<LineMaterial>::default() || drawer.changed {
             let old_handle = tree.material_handle.clone();
-            tree.material_handle =
-                dbg!(materials.add(LineMaterial::new(tree.branch_color)).clone());
+            tree.material_handle = materials.add(LineMaterial::new(tree.branch_color)).clone();
             materials.remove(&old_handle);
         }
     }
@@ -247,7 +247,7 @@ impl SideMenuOptions for FractalPlant {
             ui.label("Branch Color");
             ui.color_edit_button_srgba(&mut col);
         });
-        if dbg!(col != old_col) {
+        if col != old_col {
             self.branch_color = Color::rgb(
                 col.r() as f32 / 255.0,
                 col.g() as f32 / 255.0,
@@ -275,6 +275,16 @@ impl SideMenuOptions for FractalPlant {
         if new_axiom != self.lsys.rules.axiom.iter().collect::<String>() {
             self.lsys.rules.axiom = new_axiom.chars().collect();
             drawer.changed = true;
+        }
+
+        ui.label("Name");
+        let mut new_name = self.lsys.name.clone();
+        ui.text_edit_singleline(&mut new_name);
+        if new_name != self.lsys.name {
+            self.lsys.name = new_name;
+        }
+        if ui.button("Save configuration").clicked() {
+            let save_result = save_load::serialize_to_file(&self, &self.lsys.name.clone());
         }
 
         if old_length != self.line_length || old_iterations != self.lsys.iterations {

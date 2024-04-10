@@ -64,7 +64,6 @@ fn main() {
                 hilbert_curve::update_line_meshes.after(hilbert_curve::update_curve_materials),
                 fractal_plant::update_plant_materials,
                 fractal_plant::update_line_meshes.after(fractal_plant::update_plant_materials),
-                test_serialize,
             ),
         )
         .run();
@@ -107,11 +106,5 @@ impl From<LineStrip> for Mesh {
         )
         // Add the point positions as an attribute
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, line.points)
-    }
-}
-
-fn test_serialize(mut query: Query<(&FractalPlant)>) {
-    for tree in query.iter() {
-        serialize_to_file(tree)
     }
 }
