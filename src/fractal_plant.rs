@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::color::Color;
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use bevy_egui::egui::Color32;
@@ -33,7 +34,7 @@ pub fn add_fractal_plant(mut commands: Commands, mut materials: ResMut<Assets<Li
         });
 }
 
-#[derive(Component, Serialize, DeserializeOwned, Debug)]
+#[derive(Component, Serialize, Deserialize, Debug)]
 pub(crate) struct FractalPlant {
     pub(crate) start_pos: Vec3,
     pub(crate) start_angle: f32,
@@ -284,7 +285,20 @@ impl SideMenuOptions for FractalPlant {
             self.lsys.name = new_name;
         }
         if ui.button("Save configuration").clicked() {
-            let save_result = save_load::serialize_to_file(&self, &self.lsys.name.clone());
+            let _ = save_load::serialize_to_file(&self, &self.lsys.name.clone());
+        }
+        if ui.button("Load configuration").clicked() {
+            let loaded: FractalPlant = save_load::deserialize_from_file(&self.lsys.name.clone())
+                .unwrap_or(FractalPlant::default());
+
+            self.start_pos = loaded.start_pos;
+            self.start_angle = loaded.start_angle;
+            self.turn_angle = loaded.turn_angle;
+            self.line_length = loaded.line_length;
+            self.branch_color = loaded.branch_color;
+            self.lsys = loaded.lsys;
+
+            drawer.changed = true;
         }
 
         if old_length != self.line_length || old_iterations != self.lsys.iterations {

@@ -1,5 +1,7 @@
 use bevy::prelude::*;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize, Serializer};
+use std::fmt::Debug;
 use std::fs;
 use std::fs::File;
 use std::io::BufReader;
@@ -16,7 +18,7 @@ pub fn serialize_to_file<T: Serialize>(object: &T, name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn deserialize_from_file<T: Deserialize>(name: &str) -> Result<T> {
+pub fn deserialize_from_file<T: DeserializeOwned + Debug>(name: &str) -> Result<T> {
     let filename = name.to_owned() + ".json";
     let path = Path::new(&filename);
     let file = File::open(path)?;
@@ -26,7 +28,7 @@ pub fn deserialize_from_file<T: Deserialize>(name: &str) -> Result<T> {
 
     buf_reader.read_to_string(&mut serialized)?;
 
-    let output: T = serde_json::from_str(&serialized)?;
+    let output: T = dbg!(serde_json::from_str(&serialized))?;
 
     Ok(output)
 }
