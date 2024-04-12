@@ -16,6 +16,7 @@ use camera::{process_input_for_cam, setup_camera};
 use fractal_plant::{add_fractal_plant, FractalPlant};
 use lsys_egui::{inspector_ui, test_side_and_top_panel, PanelOccupiedScreenSpace};
 use lsys_rendering::LineMaterial;
+use plant_pot::{add_pot, load_pot};
 use std::path::Path;
 
 use save_load::serialize_to_file;
@@ -28,6 +29,7 @@ mod hilbert_curve;
 mod lsys_egui;
 mod lsys_rendering;
 mod lsystems;
+mod plant_pot;
 mod save_load;
 
 fn main() {
@@ -47,7 +49,7 @@ fn main() {
             ..Default::default()
         })
         .init_resource::<PanelOccupiedScreenSpace>()
-        .add_systems(Startup, (add_fractal_plant, setup_camera))
+        .add_systems(Startup, (add_fractal_plant, setup_camera, load_pot))
         .add_systems(
             PreUpdate,
             (
