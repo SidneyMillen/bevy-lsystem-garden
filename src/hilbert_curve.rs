@@ -1,11 +1,11 @@
 use std::f32::consts::PI;
 
+use crate::fractal_plant::LineList;
 use crate::lsys_rendering::GenerateLineList;
 use crate::lsys_rendering::LineMaterial;
 use crate::lsystems::LSys;
 use crate::lsystems::LSysDrawer;
 use crate::lsystems::LSysRules;
-use crate::LineList;
 
 use bevy::prelude::*;
 
@@ -74,7 +74,7 @@ impl Default for HilbertCurve {
             mesh_handle: Handle::<Mesh>::default(),
             material_handle: Handle::<LineMaterial>::default(),
         };
-        tmp.line_mesh = tmp.generate_line_mesh();
+        tmp.line_mesh = tmp.generate_line_list();
 
         tmp
     }
@@ -98,7 +98,7 @@ pub fn add_default_hilbert_curve(
 }
 
 impl GenerateLineList for HilbertCurve {
-    fn generate_line_mesh(&self) -> LineList {
+    fn generate_line_list(&self) -> LineList {
         let mut line_list = LineList { lines: vec![] };
         let mut current_pos = self.start_pos;
         let mut current_heading = self.start_heading;
@@ -161,7 +161,7 @@ pub fn update_line_meshes(
     for (entity, mut curve, mut drawer) in &mut query {
         if drawer.changed {
             meshes.remove(&curve.mesh_handle);
-            curve.line_mesh = curve.generate_line_mesh();
+            curve.line_mesh = curve.generate_line_list();
             let handle = meshes.add(curve.line_mesh.clone());
             curve.mesh_handle = handle.clone();
 

@@ -16,16 +16,37 @@ use bevy::{
 use serde::{Deserialize, Serialize};
 
 use crate::fractal_plant::FractalPlant;
-use crate::LineList;
+use crate::fractal_plant::LineList;
 
 pub trait GenerateLineList {
-    fn generate_line_mesh(&self) -> LineList;
+    fn generate_line_list(&self) -> LineList;
 }
+
+#[derive(Event, Debug, Clone)]
+pub struct LineMeshUpdateEvent(LineMesh);
 
 #[derive(Asset, TypePath, Default, AsBindGroup, Debug, Clone, Serialize, Deserialize)]
 pub struct LineMaterial {
     #[uniform(0)]
     color: Color,
+}
+#[derive(Component, Debug, Serialize, Deserialize, Clone)]
+pub struct LineMesh {
+    #[serde(skip_serializing, skip_deserializing)]
+    pub(crate) line_list: LineList,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub mesh_handle: Handle<Mesh>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub material_handle: Handle<LineMaterial>,
+}
+impl Default for LineMesh {
+    fn default() -> Self {
+        Self {
+            line_list: LineList { lines: vec![] },
+            mesh_handle: Handle::<Mesh>::default(),
+            material_handle: Handle::<LineMaterial>::default(),
+        }
+    }
 }
 
 impl LineMaterial {
@@ -33,6 +54,8 @@ impl LineMaterial {
         Self { color }
     }
 }
+
+pub fn update_line_mesh_materials() {}
 
 impl Material for LineMaterial {
     fn fragment_shader() -> ShaderRef {

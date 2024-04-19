@@ -33,24 +33,3 @@ fn main() {
         )
         .run();
 }
-
-/// A list of lines with a start and end position
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct LineList {
-    lines: Vec<(Vec3, Vec3)>,
-}
-
-impl From<LineList> for Mesh {
-    fn from(line: LineList) -> Self {
-        let vertices: Vec<_> = line.lines.into_iter().flat_map(|(a, b)| [a, b]).collect();
-
-        Mesh::new(
-            // This tells wgpu that the positions are list of lines
-            // where every pair is a start and end point
-            PrimitiveTopology::LineList,
-            RenderAssetUsages::RENDER_WORLD,
-        )
-        // Add the vertices positions as an attribute
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
-    }
-}

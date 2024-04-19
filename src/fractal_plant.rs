@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use bevy::render::color::Color;
 
+use bevy::render::mesh::PrimitiveTopology;
+use bevy::render::render_asset::RenderAssetUsages;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -10,10 +12,9 @@ use std::f32::consts::PI;
 use bevy::sprite::MaterialMesh2dBundle;
 
 use crate::lsys_egui::SideMenuOptions;
-use crate::lsys_rendering::GenerateLineList;
-use crate::lsys_rendering::LineMaterial;
+use crate::lsys_rendering::{GenerateLineList, LineMesh};
+use crate::lsys_rendering::{LineMaterial, LineMeshUpdateEvent};
 use crate::save_load;
-use crate::LineList;
 
 use crate::lsystems::LSysDrawer;
 
@@ -23,13 +24,14 @@ use crate::lsystems::LSys;
 
 pub fn add_fractal_plant(mut commands: Commands, mut materials: ResMut<Assets<LineMaterial>>) {
     let tree = FractalPlant::default();
-    let tree_handle = tree.mesh_handle.clone();
+    let plant_mesh = LineMesh::default();
+    let plant_mesh_handle = plant_mesh.mesh_handle;
     commands
-        .spawn(tree)
+        .spawn((tree, plant_mesh))
         .insert(LSysDrawer { changed: true })
         .insert(MaterialMeshBundle {
             material: materials.add(LineMaterial::new(Color::rgb(1.0, 1.0, 1.0))),
-            mesh: tree_handle,
+            mesh: plant_mesh_handle,
             ..Default::default()
         });
 }
@@ -42,12 +44,6 @@ pub(crate) struct FractalPlant {
     pub(crate) line_length: f32,
     pub(crate) branch_color: Color,
     pub(crate) lsys: LSys,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub(crate) line_mesh: LineList,
-    #[serde(skip_serializing, skip_deserializing)]
-    mesh_handle: Handle<Mesh>,
-    #[serde(skip_serializing, skip_deserializing)]
-    material_handle: Handle<LineMaterial>,
 }
 
 impl FractalPlant {
@@ -64,9 +60,6 @@ impl FractalPlant {
             line_length,
             branch_color,
             lsys,
-            line_mesh: LineList { lines: vec![] },
-            mesh_handle: Handle::<Mesh>::default(),
-            material_handle: Handle::<LineMaterial>::default(),
             ..Default::default()
         }
     }
@@ -74,7 +67,7 @@ impl FractalPlant {
 
 impl Default for FractalPlant {
     fn default() -> Self {
-        let mut tmp = Self {
+        let mut plant = Self {
             start_pos: Vec3::new(0.0, 0.0, 0.0),
             turn_angle: PI / 4.0,
             start_angle: 0.0,
@@ -88,32 +81,27 @@ impl Default for FractalPlant {
                 ),
                 iterations: 2,
             },
-            line_mesh: LineList { lines: vec![] },
-            mesh_handle: Handle::<Mesh>::default(),
-            material_handle: Handle::<LineMaterial>::default(),
         };
-        tmp.line_mesh = tmp.generate_line_mesh();
 
-        tmp
+        plant
     }
 }
 
 pub fn update_line_meshes(
-    mut query: Query<(Entity, &mut FractalPlant, &mut LSysDrawer)>,
+    mut query: Query<(Entity, &mut LineMesh, &mut LSysDrawer)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut commands: Commands,
 ) {
-    for (entity, mut tree, mut drawer) in &mut query {
+    for (entity, mut mesh, mut drawer) in &mut query {
         if drawer.changed {
-            meshes.remove(&tree.mesh_handle);
-            tree.line_mesh = tree.generate_line_mesh();
-            let handle = meshes.add(tree.line_mesh.clone());
-            tree.mesh_handle = handle.clone();
+            meshes.remove(&mesh.mesh_handle);
+            let handle = meshes.add(mesh.line_list.clone());
+            mesh.mesh_handle = handle.clone();
 
             commands
                 .entity(entity)
                 .insert(MaterialMeshBundle {
-                    material: tree.material_handle.clone(),
+                    material: mesh.material_handle.clone(),
                     mesh: handle,
                     ..Default::default()
                 })
@@ -123,35 +111,28 @@ pub fn update_line_meshes(
     }
 }
 
-pub fn update_plant_materials(
-    mut query: Query<(&mut FractalPlant, &mut LSysDrawer)>,
-    mut materials: ResMut<Assets<LineMaterial>>,
+pub fn update_plant_meshes(
+    mut query: Query<(&FractalPlant, &mut LineMesh)>,
+    mesh_updates: EventReader<LineMeshUpdateEvent>,
 ) {
-    for (mut tree, drawer) in &mut query {
-        if tree.material_handle == Handle::<LineMaterial>::default() || drawer.changed {
-            let old_handle = tree.material_handle.clone();
-            tree.material_handle = materials.add(LineMaterial::new(tree.branch_color)).clone();
-            materials.remove(&old_handle);
-        }
+    for update in mesh_updates.read() {
+        update.
     }
-}
 
-impl GenerateLineList for FractalPlant {
-    fn generate_line_mesh(&self) -> LineList {
-        let mut line_list = LineList { lines: vec![] };
-        let start_pos = self.start_pos;
+    for (plant, mut line_mesh) in query.iter_mut() {
+        let start_pos = plant.start_pos;
         let mut v_pos = vec![start_pos];
-        let iterations = self.lsys.iterations;
+        let iterations = plant.lsys.iterations;
 
         let mut pos = start_pos;
         let mut pos_stack: Vec<Vec3> = Vec::new();
         pos_stack.push(start_pos);
-        let mut heading: Quat = Quat::from_rotation_z(self.start_angle);
+        let mut heading: Quat = Quat::from_rotation_z(plant.start_angle);
         let mut angle_stack: Vec<Quat> = Vec::new();
         angle_stack.push(heading);
-        let branch_length = self.line_length;
+        let branch_length = plant.line_length;
 
-        let evaluated_lsystem = self.lsys.rules.eval(&iterations).unwrap_or("".to_string());
+        let evaluated_lsystem = plant.lsys.rules.eval(&iterations).unwrap_or("".to_string());
 
         for c in evaluated_lsystem.chars() {
             match c {
@@ -170,16 +151,16 @@ impl GenerateLineList for FractalPlant {
                     angle_stack.push(heading);
                 }
                 '-' => {
-                    heading *= Quat::from_rotation_z(-self.turn_angle);
+                    heading *= Quat::from_rotation_z(-plant.turn_angle);
                 }
                 '+' => {
-                    heading *= Quat::from_rotation_z(self.turn_angle);
+                    heading *= Quat::from_rotation_z(plant.turn_angle);
                 }
                 '<' => {
-                    heading *= Quat::from_rotation_x(-self.turn_angle);
+                    heading *= Quat::from_rotation_x(-plant.turn_angle);
                 }
                 '>' => {
-                    heading *= Quat::from_rotation_x(self.turn_angle);
+                    heading *= Quat::from_rotation_x(plant.turn_angle);
                 }
                 ']' => {
                     pos = pos_stack.pop().unwrap_or(pos);
@@ -187,10 +168,11 @@ impl GenerateLineList for FractalPlant {
                     heading = angle_stack.pop().unwrap_or(heading);
                 }
                 _ => {}
+
             }
         }
 
-        line_list
+        line_mesh.line_list = line_list;
     }
 }
 
@@ -304,5 +286,25 @@ impl SideMenuOptions for FractalPlant {
         if old_length != self.line_length || old_iterations != self.lsys.iterations {
             drawer.changed = true;
         }
+    }
+}
+/// A list of lines with a start and end position
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LineList {
+    pub(crate) lines: Vec<(Vec3, Vec3)>,
+}
+
+impl From<LineList> for Mesh {
+    fn from(line: LineList) -> Self {
+        let vertices: Vec<_> = line.lines.into_iter().flat_map(|(a, b)| [a, b]).collect();
+
+        Mesh::new(
+            // This tells wgpu that the positions are list of lines
+            // where every pair is a start and end point
+            PrimitiveTopology::LineList,
+            RenderAssetUsages::RENDER_WORLD,
+        )
+        // Add the vertices positions as an attribute
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
     }
 }
