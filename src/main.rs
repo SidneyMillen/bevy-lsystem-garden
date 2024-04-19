@@ -1,25 +1,11 @@
 use bevy::{
     prelude::*,
-    render::{
-        mesh::{shape::Quad, PrimitiveTopology},
-        render_asset::RenderAssetUsages,
-        settings::{Backends, RenderCreation, WgpuSettings},
-        view::VisibilitySystems,
-        RenderPlugin,
-    },
+    render::{mesh::PrimitiveTopology, render_asset::RenderAssetUsages},
 };
 
-use bevy_egui::{egui, systems::InputResources, EguiContext, EguiContexts, EguiPlugin, EguiSet};
-use bevy_flycam::prelude::*;
-use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use camera::{process_input_for_cam, reset_camera_position, setup_camera, CameraResetEvent};
-use fractal_plant::{add_fractal_plant, FractalPlant};
-use lsys_egui::{inspector_ui, test_side_and_top_panel, PanelOccupiedScreenSpace};
+use fractal_plant::add_fractal_plant;
 use lsys_rendering::LineMaterial;
-use plant_pot::{add_pot, load_pot};
-use std::path::Path;
-
-use save_load::serialize_to_file;
+use plant_pot::load_pot;
 
 use serde::{Deserialize, Serialize};
 
@@ -36,32 +22,15 @@ fn main() {
     App::new()
         .add_plugins((DefaultPlugins, MaterialPlugin::<LineMaterial>::default()))
         //.add_plugins(NoCameraPlayerPlugin)
-        .add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin) // adds default options and `InspectorEguiImpl`s
-        .add_plugins(EguiPlugin)
-        .add_plugins(PanOrbitCameraPlugin)
-        .insert_resource(MovementSettings {
-            sensitivity: 0.00015, // default: 0.00012
-            speed: 12.0,          // default: 12.0
-        })
-        .init_resource::<PanelOccupiedScreenSpace>()
-        .add_systems(Startup, (add_fractal_plant, setup_camera, load_pot))
-        .add_systems(
-            PreUpdate,
-            (
-                test_side_and_top_panel,
-                inspector_ui.after(test_side_and_top_panel),
-            )
-                .after(EguiSet::BeginFrame),
-        )
+        .add_plugins((lsys_egui::MyEguiPlugin, camera::MyCameraPlugin))
+        .add_systems(Startup, (add_fractal_plant, load_pot))
         .add_systems(
             Update,
             (
-                (process_input_for_cam, reset_camera_position).chain(),
                 fractal_plant::update_plant_materials,
                 fractal_plant::update_line_meshes.after(fractal_plant::update_plant_materials),
             ),
         )
-        .add_event::<CameraResetEvent>()
         .run();
 }
 
