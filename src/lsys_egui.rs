@@ -3,9 +3,25 @@ use bevy::{
     render::camera::RenderTarget,
     window::{PresentMode, PrimaryWindow, WindowRef, WindowResolution},
 };
-use bevy_egui::{egui, EguiContext, EguiContexts, EguiPlugin, EguiUserTextures};
+use bevy_egui::{egui, EguiContext, EguiContexts, EguiPlugin, EguiSet, EguiUserTextures};
 
 use crate::{fractal_plant::FractalPlant, lsystems::LSysDrawer};
+
+pub struct MyEguiPlugin;
+
+impl Plugin for MyEguiPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<PanelOccupiedScreenSpace>()
+            .add_plugins(EguiPlugin)
+            .add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin) // adds default options and `InspectorEguiImpl`s
+            .add_systems(
+                PreUpdate,
+                (test_side_and_top_panel, inspector_ui)
+                    .chain()
+                    .after(EguiSet::BeginFrame),
+            );
+    }
+}
 
 #[derive(Default, Resource, Debug, Clone)]
 pub struct PanelOccupiedScreenSpace {

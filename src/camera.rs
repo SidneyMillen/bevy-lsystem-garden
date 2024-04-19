@@ -1,5 +1,5 @@
 use bevy::{prelude::*, window::PrimaryWindow};
-use bevy_flycam::FlyCam;
+use bevy_flycam::{FlyCam, MovementSettings};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 
 use crate::lsys_egui::PanelOccupiedScreenSpace;
@@ -11,6 +11,26 @@ pub struct OriginalCameraTransform(Transform);
 
 #[derive(Component, Debug)]
 pub struct PlayerCam;
+
+pub struct MyCameraPlugin;
+
+impl Plugin for MyCameraPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(PanOrbitCameraPlugin)
+            .add_systems(Startup, setup_camera)
+            .add_systems(
+                Update,
+                (
+                    update_camera_transform_system,
+                    process_input_for_cam,
+                    //bugged reset_camera_position,
+                )
+                    .chain(),
+            )
+            .add_event::<CameraResetEvent>();
+    }
+}
+
 pub fn setup_camera(mut commands: Commands) {
     let camera_pos = Vec3::new(0.0, 0.0, 5.0);
     let camera_transform =
