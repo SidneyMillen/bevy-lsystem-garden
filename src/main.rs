@@ -12,7 +12,7 @@ use bevy::{
 use bevy_egui::{egui, systems::InputResources, EguiContext, EguiContexts, EguiPlugin, EguiSet};
 use bevy_flycam::prelude::*;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use camera::{process_input_for_cam, setup_camera};
+use camera::{process_input_for_cam, reset_camera_position, setup_camera, CameraResetEvent};
 use fractal_plant::{add_fractal_plant, FractalPlant};
 use lsys_egui::{inspector_ui, test_side_and_top_panel, PanelOccupiedScreenSpace};
 use lsys_rendering::LineMaterial;
@@ -43,11 +43,6 @@ fn main() {
             sensitivity: 0.00015, // default: 0.00012
             speed: 12.0,          // default: 12.0
         })
-        .insert_resource(KeyBindings {
-            move_ascend: KeyCode::KeyE,
-            move_descend: KeyCode::KeyQ,
-            ..Default::default()
-        })
         .init_resource::<PanelOccupiedScreenSpace>()
         .add_systems(Startup, (add_fractal_plant, setup_camera, load_pot))
         .add_systems(
@@ -61,13 +56,12 @@ fn main() {
         .add_systems(
             Update,
             (
-                process_input_for_cam,
-                hilbert_curve::update_curve_materials,
-                hilbert_curve::update_line_meshes.after(hilbert_curve::update_curve_materials),
+                (process_input_for_cam, reset_camera_position).chain(),
                 fractal_plant::update_plant_materials,
                 fractal_plant::update_line_meshes.after(fractal_plant::update_plant_materials),
             ),
         )
+        .add_event::<CameraResetEvent>()
         .run();
 }
 
@@ -89,24 +83,5 @@ impl From<LineList> for Mesh {
         )
         // Add the vertices positions as an attribute
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
-    }
-}
-
-/// A list of points that will have a line drawn between each consecutive points
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct LineStrip {
-    points: Vec<Vec3>,
-}
-
-impl From<LineStrip> for Mesh {
-    fn from(line: LineStrip) -> Self {
-        Mesh::new(
-            // This tells wgpu that the positions are a list of points
-            // where a line will be drawn between each consecutive point
-            PrimitiveTopology::LineStrip,
-            RenderAssetUsages::RENDER_WORLD,
-        )
-        // Add the point positions as an attribute
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, line.points)
     }
 }

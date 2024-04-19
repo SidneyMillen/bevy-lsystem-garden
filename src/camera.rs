@@ -7,7 +7,10 @@ use crate::lsys_egui::PanelOccupiedScreenSpace;
 const CAMERA_TARGET: Vec3 = Vec3::ZERO;
 
 #[derive(Resource, Deref, DerefMut)]
-struct OriginalCameraTransform(Transform);
+pub struct OriginalCameraTransform(Transform);
+
+#[derive(Component, Debug)]
+pub struct PlayerCam;
 pub fn setup_camera(mut commands: Commands) {
     let camera_pos = Vec3::new(0.0, 0.0, 5.0);
     let camera_transform =
@@ -25,30 +28,32 @@ pub fn setup_camera(mut commands: Commands) {
             button_pan: MouseButton::Right,
             modifier_pan: Some(KeyCode::ShiftLeft),
             ..Default::default()
-        });
+        })
+        .insert(PlayerCam);
 }
 
+#[derive(Debug, Event)]
+pub struct CameraResetEvent;
+
 pub fn reset_camera_position(
-    mut commands: Commands,
     original_camera_transform: Res<OriginalCameraTransform>,
     mut camera_query: Query<&mut Transform, With<FlyCam>>,
+    mut reset_events: EventReader<CameraResetEvent>,
 ) {
-    let original_camera_transform = original_camera_transform.0.clone();
-
-    for mut transform in &mut camera_query {
-        *transform = original_camera_transform.clone();
+    for _ in reset_events.read().into_iter() {
+        for mut transform in &mut camera_query {
+            transform.translation = original_camera_transform.translation;
+            transform.look_at(CAMERA_TARGET, Vec3::Y);
+        }
     }
 }
 
 pub fn process_input_for_cam(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(&Camera3d, &mut Transform), With<PanOrbitCamera>>,
+    mut reset_events: EventWriter<CameraResetEvent>,
 ) {
     if keyboard_input.just_pressed(KeyCode::KeyR) {
-        for (_, mut transform) in &mut query {
-            transform.translation = Vec3::new(0.0, 0.0, 5.0);
-            transform.look_at(CAMERA_TARGET, Vec3::Y);
-        }
+        reset_events.send(CameraResetEvent);
     }
 }
 
