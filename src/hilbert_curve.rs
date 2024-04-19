@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
+use crate::lsys_rendering::GenerateLineList;
 use crate::lsys_rendering::LineMaterial;
-use crate::lsys_rendering::RenderToLineList;
 use crate::lsystems::LSys;
 use crate::lsystems::LSysDrawer;
 use crate::lsystems::LSysRules;
@@ -97,7 +97,7 @@ pub fn add_default_hilbert_curve(
         });
 }
 
-impl RenderToLineList for HilbertCurve {
+impl GenerateLineList for HilbertCurve {
     fn generate_line_mesh(&self) -> LineList {
         let mut line_list = LineList { lines: vec![] };
         let mut current_pos = self.start_pos;

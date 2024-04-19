@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use lsystem::MapRules;
 
 use crate::fractal_plant::FractalPlant;
-use crate::lsys_rendering::RenderToLineList;
+use crate::lsys_rendering::GenerateLineList;
 
 #[derive(Component, Debug, Serialize, Deserialize)]
 pub(crate) struct LSys {

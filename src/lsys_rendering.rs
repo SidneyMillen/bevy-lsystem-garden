@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::fractal_plant::FractalPlant;
 use crate::LineList;
 
-pub trait RenderToLineList {
+pub trait GenerateLineList {
     fn generate_line_mesh(&self) -> LineList;
 }
 

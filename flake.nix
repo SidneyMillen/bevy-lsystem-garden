@@ -42,6 +42,7 @@
             pkg-config
             pre-commit
             rust-analyzer
+rustc
             rustPackages.clippy
             rustfmt
             tokei

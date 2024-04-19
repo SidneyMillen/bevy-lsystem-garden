@@ -10,8 +10,8 @@ use std::f32::consts::PI;
 use bevy::sprite::MaterialMesh2dBundle;
 
 use crate::lsys_egui::SideMenuOptions;
+use crate::lsys_rendering::GenerateLineList;
 use crate::lsys_rendering::LineMaterial;
-use crate::lsys_rendering::RenderToLineList;
 use crate::save_load;
 use crate::LineList;
 
@@ -136,7 +136,7 @@ pub fn update_plant_materials(
     }
 }
 
-impl RenderToLineList for FractalPlant {
+impl GenerateLineList for FractalPlant {
     fn generate_line_mesh(&self) -> LineList {
         let mut line_list = LineList { lines: vec![] };
         let start_pos = self.start_pos;
