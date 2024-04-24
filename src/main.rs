@@ -15,6 +15,7 @@ mod hilbert_curve;
 mod lsys_egui;
 mod lsys_rendering;
 mod lsystems;
+mod pickup;
 mod plant_pot;
 mod save_load;
 
