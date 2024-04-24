@@ -22,8 +22,11 @@ pub trait GenerateLineList {
     fn generate_line_list(&self) -> LineList;
 }
 
-#[derive(Event, Debug, Clone)]
-pub struct LineMeshUpdateEvent(LineMesh);
+#[derive(Event, Debug)]
+pub enum FractalPlantUpdateEvent {
+    MESH(Entity),
+    MATERIAL(Entity),
+}
 
 #[derive(Asset, TypePath, Default, AsBindGroup, Debug, Clone, Serialize, Deserialize)]
 pub struct LineMaterial {
@@ -54,8 +57,6 @@ impl LineMaterial {
         Self { color }
     }
 }
-
-pub fn update_line_mesh_materials() {}
 
 impl Material for LineMaterial {
     fn fragment_shader() -> ShaderRef {

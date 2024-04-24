@@ -1,3 +1,4 @@
+use bevy::ecs::reflect::ReflectCommandExt;
 use bevy::prelude::*;
 use bevy::render::color::Color;
 
@@ -12,8 +13,8 @@ use std::f32::consts::PI;
 use bevy::sprite::MaterialMesh2dBundle;
 
 use crate::lsys_egui::SideMenuOptions;
+use crate::lsys_rendering::{FractalPlantUpdateEvent, LineMaterial};
 use crate::lsys_rendering::{GenerateLineList, LineMesh};
-use crate::lsys_rendering::{LineMaterial, LineMeshUpdateEvent};
 use crate::save_load;
 
 use crate::lsystems::LSysDrawer;
@@ -22,18 +23,24 @@ use crate::lsystems::LSysRules;
 
 use crate::lsystems::LSys;
 
-pub fn add_fractal_plant(mut commands: Commands, mut materials: ResMut<Assets<LineMaterial>>) {
+pub fn add_fractal_plant(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<LineMaterial>>,
+    mut update_writer: EventWriter<FractalPlantUpdateEvent>,
+) {
     let tree = FractalPlant::default();
     let plant_mesh = LineMesh::default();
-    let plant_mesh_handle = plant_mesh.mesh_handle;
-    commands
+    let plant_mesh_handle = plant_mesh.mesh_handle.clone();
+    let id = commands
         .spawn((tree, plant_mesh))
         .insert(LSysDrawer { changed: true })
         .insert(MaterialMeshBundle {
             material: materials.add(LineMaterial::new(Color::rgb(1.0, 1.0, 1.0))),
             mesh: plant_mesh_handle,
             ..Default::default()
-        });
+        })
+        .id();
+    update_writer.send(FractalPlantUpdateEvent::MESH(id));
 }
 
 #[derive(Component, Serialize, Deserialize, Debug)]
@@ -87,97 +94,123 @@ impl Default for FractalPlant {
     }
 }
 
-pub fn update_line_meshes(
-    mut query: Query<(Entity, &mut LineMesh, &mut LSysDrawer)>,
+pub fn update_plant_meshes(
+    mut query: Query<(Entity, &FractalPlant, &mut LineMesh)>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut mesh_updates: EventReader<FractalPlantUpdateEvent>,
     mut commands: Commands,
 ) {
-    for (entity, mut mesh, mut drawer) in &mut query {
-        if drawer.changed {
-            meshes.remove(&mesh.mesh_handle);
-            let handle = meshes.add(mesh.line_list.clone());
-            mesh.mesh_handle = handle.clone();
-
-            commands
-                .entity(entity)
-                .insert(MaterialMeshBundle {
-                    material: mesh.material_handle.clone(),
-                    mesh: handle,
-                    ..Default::default()
-                })
-                .remove::<bevy::render::primitives::Aabb>();
-            drawer.changed = false;
-        }
-    }
-}
-
-pub fn update_plant_meshes(
-    mut query: Query<(&FractalPlant, &mut LineMesh)>,
-    mesh_updates: EventReader<LineMeshUpdateEvent>,
-) {
     for update in mesh_updates.read() {
-        update.
-    }
+        match update {
+            FractalPlantUpdateEvent::MESH(entity) => {
+                for (q_entity, plant, mut mesh) in query.iter_mut() {
+                    if &q_entity == entity {
+                        dbg!("Updating plant mesh");
+                        let mut new_line_list = mesh.line_list.lines.clone();
+                        let start_pos = plant.start_pos;
+                        let mut v_pos = vec![start_pos];
+                        let iterations = plant.lsys.iterations;
 
-    for (plant, mut line_mesh) in query.iter_mut() {
-        let start_pos = plant.start_pos;
-        let mut v_pos = vec![start_pos];
-        let iterations = plant.lsys.iterations;
+                        let mut pos = start_pos;
+                        let mut pos_stack: Vec<Vec3> = Vec::new();
+                        pos_stack.push(start_pos);
+                        let mut heading: Quat = Quat::from_rotation_z(plant.start_angle);
+                        let mut angle_stack: Vec<Quat> = Vec::new();
+                        angle_stack.push(heading);
+                        let branch_length = plant.line_length;
 
-        let mut pos = start_pos;
-        let mut pos_stack: Vec<Vec3> = Vec::new();
-        pos_stack.push(start_pos);
-        let mut heading: Quat = Quat::from_rotation_z(plant.start_angle);
-        let mut angle_stack: Vec<Quat> = Vec::new();
-        angle_stack.push(heading);
-        let branch_length = plant.line_length;
+                        let evaluated_lsystem =
+                            plant.lsys.rules.eval(&iterations).unwrap_or("".to_string());
 
-        let evaluated_lsystem = plant.lsys.rules.eval(&iterations).unwrap_or("".to_string());
+                        for c in evaluated_lsystem.chars() {
+                            match c {
+                                '1' => {
+                                    let new_pos =
+                                        heading.mul_vec3(Vec3::new(0.0, branch_length, 0.0)) + pos;
+                                    new_line_list.push((pos, new_pos));
 
-        for c in evaluated_lsystem.chars() {
-            match c {
-                '1' => {
-                    let new_pos = heading.mul_vec3(Vec3::new(0.0, branch_length, 0.0)) + pos;
-                    line_list.lines.push((pos, new_pos));
+                                    pos = new_pos;
+                                }
+                                '0' => {
+                                    let new_pos =
+                                        heading.mul_vec3(Vec3::new(0.0, branch_length, 0.0)) + pos;
+                                    new_line_list.push((pos, new_pos));
+                                }
+                                '[' => {
+                                    pos_stack.push(pos);
+                                    angle_stack.push(heading);
+                                }
+                                '-' => {
+                                    heading *= Quat::from_rotation_z(-plant.turn_angle);
+                                }
+                                '+' => {
+                                    heading *= Quat::from_rotation_z(plant.turn_angle);
+                                }
+                                '<' => {
+                                    heading *= Quat::from_rotation_x(-plant.turn_angle);
+                                }
+                                '>' => {
+                                    heading *= Quat::from_rotation_x(plant.turn_angle);
+                                }
+                                ']' => {
+                                    pos = pos_stack.pop().unwrap_or(pos);
+                                    v_pos.push(pos);
+                                    heading = angle_stack.pop().unwrap_or(heading);
+                                }
+                                _ => {}
+                            }
+                        }
 
-                    pos = new_pos;
+                        meshes.remove(mesh.mesh_handle.clone());
+                        let handle = meshes.add(LineList {
+                            lines: new_line_list,
+                        });
+                        mesh.mesh_handle = handle.clone();
+                        commands
+                            .entity(entity.clone())
+                            .insert(MaterialMeshBundle {
+                                material: mesh.material_handle.clone(),
+                                mesh: handle,
+                                ..Default::default()
+                            })
+                            .remove::<bevy::render::primitives::Aabb>();
+                    }
                 }
-                '0' => {
-                    let new_pos = heading.mul_vec3(Vec3::new(0.0, branch_length, 0.0)) + pos;
-                    line_list.lines.push((pos, new_pos));
-                }
-                '[' => {
-                    pos_stack.push(pos);
-                    angle_stack.push(heading);
-                }
-                '-' => {
-                    heading *= Quat::from_rotation_z(-plant.turn_angle);
-                }
-                '+' => {
-                    heading *= Quat::from_rotation_z(plant.turn_angle);
-                }
-                '<' => {
-                    heading *= Quat::from_rotation_x(-plant.turn_angle);
-                }
-                '>' => {
-                    heading *= Quat::from_rotation_x(plant.turn_angle);
-                }
-                ']' => {
-                    pos = pos_stack.pop().unwrap_or(pos);
-                    v_pos.push(pos);
-                    heading = angle_stack.pop().unwrap_or(heading);
-                }
-                _ => {}
-
             }
+            _ => {}
         }
-
-        line_mesh.line_list = line_list;
     }
 }
 
-impl SideMenuOptions for FractalPlant {
-    fn side_menu_options(&mut self, drawer: &mut LSysDrawer, ui: &mut bevy_egui::egui::Ui) {
+pub fn update_plant_materials(
+    mut query: Query<(Entity, &FractalPlant, &mut LineMesh)>,
+    mut mats: ResMut<Assets<LineMaterial>>,
+    mut material_updates: EventReader<FractalPlantUpdateEvent>,
+) {
+    for event in material_updates.read() {
+        match event {
+            FractalPlantUpdateEvent::MATERIAL(entity) => {
+                for (q_entity, plant, mut mesh) in query.iter_mut() {
+                    if &q_entity == entity {
+                        let new_material = LineMaterial::new(plant.branch_color);
+                        mesh.material_handle = mats.add(new_material);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+impl SideMenuOptions<FractalPlantUpdateEvent> for FractalPlant {
+    fn side_menu_options(
+        &mut self,
+        ui: &mut bevy_egui::egui::Ui,
+        plant_event_writer: &mut EventWriter<FractalPlantUpdateEvent>,
+        entity_id: Entity,
+    ) {
+        let mut mesh_changed = false;
+        let mut mat_changed = false;
         let old_length = self.line_length;
         let old_iterations = self.lsys.iterations;
 
@@ -191,7 +224,7 @@ impl SideMenuOptions for FractalPlant {
             ));
             if new_start_angle_deg != self.start_angle.to_degrees() {
                 self.start_angle = new_start_angle_deg.to_radians();
-                drawer.changed = true;
+                mesh_changed = true;
             }
         });
         let mut new_turn_angle_deg = self.turn_angle.to_degrees();
@@ -203,7 +236,7 @@ impl SideMenuOptions for FractalPlant {
             ));
             if new_turn_angle_deg != self.turn_angle.to_degrees() {
                 self.turn_angle = new_turn_angle_deg.to_radians();
-                drawer.changed = true;
+                mesh_changed = true;
             }
         });
         ui.horizontal(|ui| {
@@ -236,7 +269,7 @@ impl SideMenuOptions for FractalPlant {
                 col.g() as f32 / 255.0,
                 col.b() as f32 / 255.0,
             );
-            drawer.changed = true;
+            mat_changed = true;
         }
 
         ui.label("Rules:");
@@ -248,7 +281,7 @@ impl SideMenuOptions for FractalPlant {
                 let old_v = v.clone();
                 ui.text_edit_singleline(v);
                 if old_v != *v {
-                    drawer.changed = true;
+                    mesh_changed = true;
                 }
             });
         }
@@ -257,7 +290,7 @@ impl SideMenuOptions for FractalPlant {
         ui.text_edit_singleline(&mut new_axiom);
         if new_axiom != self.lsys.rules.axiom.iter().collect::<String>() {
             self.lsys.rules.axiom = new_axiom.chars().collect();
-            drawer.changed = true;
+            mesh_changed = true;
         }
 
         ui.label("Name");
@@ -280,11 +313,18 @@ impl SideMenuOptions for FractalPlant {
             self.branch_color = loaded.branch_color;
             self.lsys = loaded.lsys;
 
-            drawer.changed = true;
+            mesh_changed = true;
         }
 
         if old_length != self.line_length || old_iterations != self.lsys.iterations {
-            drawer.changed = true;
+            mesh_changed = true;
+        }
+
+        if mesh_changed {
+            plant_event_writer.send(FractalPlantUpdateEvent::MESH(entity_id));
+        }
+        if mat_changed {
+            plant_event_writer.send(FractalPlantUpdateEvent::MATERIAL(entity_id));
         }
     }
 }

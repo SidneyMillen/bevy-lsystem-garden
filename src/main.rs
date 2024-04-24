@@ -4,7 +4,7 @@ use bevy::{
 };
 
 use fractal_plant::add_fractal_plant;
-use lsys_rendering::LineMaterial;
+use lsys_rendering::{FractalPlantUpdateEvent, LineMaterial};
 use plant_pot::load_pot;
 
 use serde::{Deserialize, Serialize};
@@ -24,12 +24,7 @@ fn main() {
         //.add_plugins(NoCameraPlayerPlugin)
         .add_plugins((lsys_egui::MyEguiPlugin, camera::MyCameraPlugin))
         .add_systems(Startup, (add_fractal_plant, load_pot))
-        .add_systems(
-            Update,
-            (
-                fractal_plant::update_plant_materials,
-                fractal_plant::update_line_meshes.after(fractal_plant::update_plant_materials),
-            ),
-        )
+        .add_systems(Update, (fractal_plant::update_plant_meshes,))
+        .add_event::<FractalPlantUpdateEvent>()
         .run();
 }

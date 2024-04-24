@@ -5,7 +5,9 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContext, EguiContexts, EguiPlugin, EguiSet, EguiUserTextures};
 
-use crate::{fractal_plant::FractalPlant, lsystems::LSysDrawer};
+use crate::{
+    fractal_plant::FractalPlant, lsys_rendering::FractalPlantUpdateEvent, lsystems::LSysDrawer,
+};
 
 pub struct MyEguiPlugin;
 
@@ -31,14 +33,20 @@ pub struct PanelOccupiedScreenSpace {
     pub bottom: f32,
 }
 
-pub trait SideMenuOptions {
-    fn side_menu_options(&mut self, drawer: &mut LSysDrawer, ui: &mut egui::Ui);
+pub trait SideMenuOptions<T: Event> {
+    fn side_menu_options(
+        &mut self,
+        ui: &mut egui::Ui,
+        event_writer: &mut EventWriter<T>,
+        entity_id: Entity,
+    );
 }
 
 pub fn test_side_and_top_panel(
     mut contexts: EguiContexts,
     mut occupied_space: ResMut<PanelOccupiedScreenSpace>,
-    mut query: Query<(&mut FractalPlant, &mut LSysDrawer)>,
+    mut query: Query<(Entity, &mut FractalPlant)>,
+    mut event_writer: EventWriter<FractalPlantUpdateEvent>,
 ) {
     occupied_space.top = egui::TopBottomPanel::top("top_panel")
         .resizable(true)
@@ -54,8 +62,8 @@ pub fn test_side_and_top_panel(
         .show(contexts.ctx_mut(), |ui| {
             ui.label("Side Panel");
 
-            for (mut tree, mut drawer) in &mut query {
-                tree.side_menu_options(&mut drawer, ui);
+            for (entity, mut tree) in query.iter_mut() {
+                tree.side_menu_options(ui, &mut event_writer, entity);
             }
 
             ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
