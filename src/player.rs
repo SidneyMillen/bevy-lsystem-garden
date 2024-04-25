@@ -1,10 +1,11 @@
 use bevy::{prelude::*, window::PrimaryWindow};
-use bevy_flycam::{FlyCam, MovementSettings};
+use bevy_flycam::{FlyCam, KeyBindings, MovementSettings, NoCameraPlayerPlugin};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 
-use crate::lsys_egui::PanelOccupiedScreenSpace;
+use crate::{lsys_egui::PanelOccupiedScreenSpace, pickup::ActiveEntityCandidate};
 
 const CAMERA_TARGET: Vec3 = Vec3::ZERO;
+const MAX_FOCUS_DIST: f32 = 4.0;
 
 #[derive(Resource, Deref, DerefMut)]
 pub struct OriginalCameraTransform(Transform);
@@ -12,20 +13,38 @@ pub struct OriginalCameraTransform(Transform);
 #[derive(Component, Debug)]
 pub struct PlayerCam;
 
-pub struct MyCameraPlugin;
+pub struct MyPlayerPlugin;
 
-impl Plugin for MyCameraPlugin {
+#[derive(Resource, Debug)]
+pub struct ActiveEntity {
+    pub id: Option<Entity>,
+}
+
+impl Plugin for MyPlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(PanOrbitCameraPlugin)
+        app.add_plugins(NoCameraPlayerPlugin)
+            .insert_resource(MovementSettings {
+                sensitivity: 0.00015, // default: 0.00012
+                speed: 6.0,           // default: 12.0
+            })
+            .insert_resource(KeyBindings {
+                move_ascend: KeyCode::KeyE,
+                move_descend: KeyCode::KeyQ,
+                ..Default::default()
+            })
+            .insert_resource(ActiveEntity { id: None })
             .add_systems(Startup, setup_camera)
             .add_systems(
                 Update,
                 (
-                    update_camera_transform_system,
-                    process_input_for_cam,
-                    //bugged reset_camera_position,
-                )
-                    .chain(),
+                    //update_camera_transform_system,
+                    seek_active_object,
+                    (
+                        process_input_for_cam,
+                        clamp_flycam_height, //bugged reset_camera_position,
+                    )
+                        .chain(),
+                ),
             )
             .add_event::<CameraResetEvent>();
     }
@@ -49,6 +68,7 @@ pub fn setup_camera(mut commands: Commands) {
             modifier_pan: Some(KeyCode::ShiftLeft),
             ..Default::default()
         })
+        .insert(FlyCam)
         .insert(PlayerCam);
 }
 
@@ -66,6 +86,12 @@ pub fn reset_camera_position(
             transform.look_at(CAMERA_TARGET, Vec3::Y);
         }
     }
+}
+
+fn clamp_flycam_height(mut query: Query<&mut Transform, With<FlyCam>>) {
+    let mut transform = query.get_single_mut().unwrap();
+
+    transform.translation.y = transform.translation.y.clamp(0.0, 5.0);
 }
 
 pub fn process_input_for_cam(
@@ -104,4 +130,20 @@ fn update_camera_transform_system(
             (top_taken - bottom_taken) * frustum_height * 0.5,
             0.0,
         ));
+}
+
+fn seek_active_object(
+    query: Query<(Entity, &Transform), With<ActiveEntityCandidate>>,
+    player: Query<(&Transform), With<PlayerCam>>,
+    mut active_entity: ResMut<ActiveEntity>,
+) {
+    let player_translation = player.get_single().unwrap().translation;
+
+    let valid_candidate_distances = query
+        .iter()
+        .map(|t| (t.0, t.1.translation.distance(player_translation)))
+        .filter(|t| t.1 < MAX_FOCUS_DIST);
+
+    let best_candidate = valid_candidate_distances.min_by(|x, y| x.1.total_cmp(&y.1));
+    active_entity.id = best_candidate.map_or(None, |x| Some(x.0));
 }

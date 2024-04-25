@@ -15,6 +15,7 @@ use bevy::sprite::MaterialMesh2dBundle;
 use crate::lsys_egui::SideMenuOptions;
 use crate::lsys_rendering::{FractalPlantUpdateEvent, LineMaterial};
 use crate::lsys_rendering::{GenerateLineList, LineMesh};
+use crate::pickup::ActiveEntityCandidate;
 use crate::save_load;
 
 use crate::lsystems::LSysDrawer;
@@ -34,6 +35,7 @@ pub fn add_fractal_plant(
     let id = commands
         .spawn((tree, plant_mesh))
         .insert(LSysDrawer { changed: true })
+        .insert(ActiveEntityCandidate)
         .insert(MaterialMeshBundle {
             material: materials.add(LineMaterial::new(Color::rgb(1.0, 1.0, 1.0))),
             mesh: plant_mesh_handle,
@@ -41,6 +43,7 @@ pub fn add_fractal_plant(
         })
         .id();
     update_writer.send(FractalPlantUpdateEvent::MESH(id));
+    update_writer.send(FractalPlantUpdateEvent::MATERIAL(id));
 }
 
 #[derive(Component, Serialize, Deserialize, Debug)]
@@ -51,6 +54,10 @@ pub(crate) struct FractalPlant {
     pub(crate) line_length: f32,
     pub(crate) branch_color: Color,
     pub(crate) lsys: LSys,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub mesh_handle: Handle<Mesh>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub material_handle: Handle<LineMaterial>,
 }
 
 impl FractalPlant {
@@ -74,7 +81,7 @@ impl FractalPlant {
 
 impl Default for FractalPlant {
     fn default() -> Self {
-        let mut plant = Self {
+        let plant = Self {
             start_pos: Vec3::new(0.0, 0.0, 0.0),
             turn_angle: PI / 4.0,
             start_angle: 0.0,
@@ -88,6 +95,8 @@ impl Default for FractalPlant {
                 ),
                 iterations: 2,
             },
+            mesh_handle: Handle::<Mesh>::default(),
+            material_handle: Handle::<LineMaterial>::default(),
         };
 
         plant
@@ -95,7 +104,7 @@ impl Default for FractalPlant {
 }
 
 pub fn update_plant_meshes(
-    mut query: Query<(Entity, &FractalPlant, &mut LineMesh)>,
+    mut query: Query<(Entity, &mut FractalPlant)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut mesh_updates: EventReader<FractalPlantUpdateEvent>,
     mut commands: Commands,
@@ -103,10 +112,9 @@ pub fn update_plant_meshes(
     for update in mesh_updates.read() {
         match update {
             FractalPlantUpdateEvent::MESH(entity) => {
-                for (q_entity, plant, mut mesh) in query.iter_mut() {
+                for (q_entity, mut plant) in query.iter_mut() {
                     if &q_entity == entity {
-                        dbg!("Updating plant mesh");
-                        let mut new_line_list = mesh.line_list.lines.clone();
+                        let mut new_line_list = Vec::<(Vec3, Vec3)>::new();
                         let start_pos = plant.start_pos;
                         let mut v_pos = vec![start_pos];
                         let iterations = plant.lsys.iterations;
@@ -161,19 +169,15 @@ pub fn update_plant_meshes(
                             }
                         }
 
-                        meshes.remove(mesh.mesh_handle.clone());
                         let handle = meshes.add(LineList {
                             lines: new_line_list,
                         });
-                        mesh.mesh_handle = handle.clone();
+                        plant.mesh_handle = handle.clone();
                         commands
-                            .entity(entity.clone())
-                            .insert(MaterialMeshBundle {
-                                material: mesh.material_handle.clone(),
-                                mesh: handle,
-                                ..Default::default()
-                            })
-                            .remove::<bevy::render::primitives::Aabb>();
+                            .entity(*entity)
+                            .remove::<Handle<Mesh>>()
+                            .remove::<bevy::render::primitives::Aabb>()
+                            .insert(handle.clone());
                     }
                 }
             }
@@ -183,22 +187,27 @@ pub fn update_plant_meshes(
 }
 
 pub fn update_plant_materials(
-    mut query: Query<(Entity, &FractalPlant, &mut LineMesh)>,
+    mut query: Query<(Entity, &mut FractalPlant)>,
     mut mats: ResMut<Assets<LineMaterial>>,
     mut material_updates: EventReader<FractalPlantUpdateEvent>,
+    mut commands: Commands,
 ) {
-    for event in material_updates.read() {
-        match event {
-            FractalPlantUpdateEvent::MATERIAL(entity) => {
-                for (q_entity, plant, mut mesh) in query.iter_mut() {
-                    if &q_entity == entity {
-                        let new_material = LineMaterial::new(plant.branch_color);
-                        mesh.material_handle = mats.add(new_material);
-                    }
+    let event = material_updates.read().last();
+    match event {
+        Some(FractalPlantUpdateEvent::MATERIAL(entity)) => {
+            for (q_entity, mut plant) in query.iter_mut() {
+                if &q_entity == entity {
+                    let new_material = LineMaterial::new(plant.branch_color);
+                    plant.material_handle = mats.add(new_material);
+                    commands
+                        .entity(*entity)
+                        .remove::<Handle<LineMaterial>>()
+                        .insert(plant.material_handle.clone());
                 }
             }
-            _ => {}
+            material_updates.clear();
         }
+        _ => {}
     }
 }
 
@@ -243,14 +252,14 @@ impl SideMenuOptions<FractalPlantUpdateEvent> for FractalPlant {
             ui.label("Line Length");
             ui.add(bevy_egui::egui::Slider::new(
                 &mut self.line_length,
-                0.0..=1.0,
+                0.0..=0.3,
             ));
         });
         ui.horizontal(|ui| {
             ui.label("Iterations");
             ui.add(bevy_egui::egui::Slider::new(
                 &mut self.lsys.iterations,
-                0..=8,
+                0..=6,
             ));
         });
         let mut col = Color32::from_rgb(
@@ -312,8 +321,7 @@ impl SideMenuOptions<FractalPlantUpdateEvent> for FractalPlant {
             self.line_length = loaded.line_length;
             self.branch_color = loaded.branch_color;
             self.lsys = loaded.lsys;
-
-            mesh_changed = true;
+            mat_changed = true;
         }
 
         if old_length != self.line_length || old_iterations != self.lsys.iterations {
