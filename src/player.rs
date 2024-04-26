@@ -2,7 +2,10 @@ use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_flycam::{FlyCam, KeyBindings, MovementSettings, NoCameraPlayerPlugin};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 
-use crate::{lsys_egui::PanelOccupiedScreenSpace, pickup::ActiveEntityCandidate};
+use crate::{
+    lsys_egui::PanelOccupiedScreenSpace,
+    pickup::{ActiveEntityCandidate, Holder},
+};
 
 const CAMERA_TARGET: Vec3 = Vec3::ZERO;
 const MAX_FOCUS_DIST: f32 = 4.0;
@@ -39,11 +42,7 @@ impl Plugin for MyPlayerPlugin {
                 (
                     //update_camera_transform_system,
                     seek_active_object,
-                    (
-                        process_input_for_cam,
-                        clamp_flycam_height, //bugged reset_camera_position,
-                    )
-                        .chain(),
+                    (process_input_for_cam, clamp_flycam_height).chain(),
                 ),
             )
             .add_event::<CameraResetEvent>();
@@ -69,6 +68,7 @@ pub fn setup_camera(mut commands: Commands) {
             ..Default::default()
         })
         .insert(FlyCam)
+        .insert(Holder::default())
         .insert(PlayerCam);
 }
 

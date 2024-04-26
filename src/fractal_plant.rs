@@ -28,7 +28,10 @@ pub fn add_fractal_plant(
     mut commands: Commands,
     mut materials: ResMut<Assets<LineMaterial>>,
     mut update_writer: EventWriter<FractalPlantUpdateEvent>,
+    assets: Res<AssetServer>,
 ) {
+    let pot: Handle<Scene> = assets.load("pot.glb#Scene0");
+
     let tree = FractalPlant::default();
     let plant_mesh = LineMesh::default();
     let plant_mesh_handle = plant_mesh.mesh_handle.clone();
@@ -40,6 +43,10 @@ pub fn add_fractal_plant(
             material: materials.add(LineMaterial::new(Color::rgb(1.0, 1.0, 1.0))),
             mesh: plant_mesh_handle,
             ..Default::default()
+        })
+        .insert(SceneBundle {
+            scene: pot,
+            ..default()
         })
         .id();
     update_writer.send(FractalPlantUpdateEvent::MESH(id));
@@ -217,122 +224,129 @@ impl SideMenuOptions<FractalPlantUpdateEvent> for FractalPlant {
         ui: &mut bevy_egui::egui::Ui,
         plant_event_writer: &mut EventWriter<FractalPlantUpdateEvent>,
         entity_id: Entity,
+        active_id: Entity,
     ) {
-        let mut mesh_changed = false;
-        let mut mat_changed = false;
-        let old_length = self.line_length;
-        let old_iterations = self.lsys.iterations;
+        match entity_id == active_id {
+            true => {
+                let mut mesh_changed = false;
+                let mut mat_changed = false;
+                let old_length = self.line_length;
+                let old_iterations = self.lsys.iterations;
 
-        let mut new_start_angle_deg = self.start_angle.to_degrees();
-        ui.label("Fractal Tree Options");
-        ui.horizontal(|ui| {
-            ui.label("Start Angle");
-            ui.add(bevy_egui::egui::Slider::new(
-                &mut new_start_angle_deg,
-                0.0..=360.0,
-            ));
-            if new_start_angle_deg != self.start_angle.to_degrees() {
-                self.start_angle = new_start_angle_deg.to_radians();
-                mesh_changed = true;
-            }
-        });
-        let mut new_turn_angle_deg = self.turn_angle.to_degrees();
-        ui.horizontal(|ui| {
-            ui.label("Turn Angle");
-            ui.add(bevy_egui::egui::Slider::new(
-                &mut new_turn_angle_deg,
-                0.0..=180.0,
-            ));
-            if new_turn_angle_deg != self.turn_angle.to_degrees() {
-                self.turn_angle = new_turn_angle_deg.to_radians();
-                mesh_changed = true;
-            }
-        });
-        ui.horizontal(|ui| {
-            ui.label("Line Length");
-            ui.add(bevy_egui::egui::Slider::new(
-                &mut self.line_length,
-                0.0..=0.3,
-            ));
-        });
-        ui.horizontal(|ui| {
-            ui.label("Iterations");
-            ui.add(bevy_egui::egui::Slider::new(
-                &mut self.lsys.iterations,
-                0..=6,
-            ));
-        });
-        let mut col = Color32::from_rgb(
-            (self.branch_color.r() * 255.0) as u8,
-            (self.branch_color.g() * 255.0) as u8,
-            (self.branch_color.b() * 255.0) as u8,
-        );
-        let old_col = col.clone();
-        ui.horizontal(|ui| {
-            ui.label("Branch Color");
-            ui.color_edit_button_srgba(&mut col);
-        });
-        if col != old_col {
-            self.branch_color = Color::rgb(
-                col.r() as f32 / 255.0,
-                col.g() as f32 / 255.0,
-                col.b() as f32 / 255.0,
-            );
-            mat_changed = true;
-        }
+                let mut new_start_angle_deg = self.start_angle.to_degrees();
+                ui.label("Fractal Tree Options");
+                ui.horizontal(|ui| {
+                    ui.label("Start Angle");
+                    ui.add(bevy_egui::egui::Slider::new(
+                        &mut new_start_angle_deg,
+                        0.0..=360.0,
+                    ));
+                    if new_start_angle_deg != self.start_angle.to_degrees() {
+                        self.start_angle = new_start_angle_deg.to_radians();
+                        mesh_changed = true;
+                    }
+                });
+                let mut new_turn_angle_deg = self.turn_angle.to_degrees();
+                ui.horizontal(|ui| {
+                    ui.label("Turn Angle");
+                    ui.add(bevy_egui::egui::Slider::new(
+                        &mut new_turn_angle_deg,
+                        0.0..=180.0,
+                    ));
+                    if new_turn_angle_deg != self.turn_angle.to_degrees() {
+                        self.turn_angle = new_turn_angle_deg.to_radians();
+                        mesh_changed = true;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Line Length");
+                    ui.add(bevy_egui::egui::Slider::new(
+                        &mut self.line_length,
+                        0.0..=0.3,
+                    ));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Iterations");
+                    ui.add(bevy_egui::egui::Slider::new(
+                        &mut self.lsys.iterations,
+                        0..=6,
+                    ));
+                });
+                let mut col = Color32::from_rgb(
+                    (self.branch_color.r() * 255.0) as u8,
+                    (self.branch_color.g() * 255.0) as u8,
+                    (self.branch_color.b() * 255.0) as u8,
+                );
+                let old_col = col.clone();
+                ui.horizontal(|ui| {
+                    ui.label("Branch Color");
+                    ui.color_edit_button_srgba(&mut col);
+                });
+                if col != old_col {
+                    self.branch_color = Color::rgb(
+                        col.r() as f32 / 255.0,
+                        col.g() as f32 / 255.0,
+                        col.b() as f32 / 255.0,
+                    );
+                    mat_changed = true;
+                }
 
-        ui.label("Rules:");
-        for (i, (k, v)) in self.lsys.rules.rules.iter_mut().enumerate() {
-            ui.horizontal(|ui| {
-                ui.label("Rule:");
-                ui.label(k.to_string());
-                ui.label(" -> ");
-                let old_v = v.clone();
-                ui.text_edit_singleline(v);
-                if old_v != *v {
+                ui.label("Rules:");
+                for (i, (k, v)) in self.lsys.rules.rules.iter_mut().enumerate() {
+                    ui.horizontal(|ui| {
+                        ui.label("Rule:");
+                        ui.label(k.to_string());
+                        ui.label(" -> ");
+                        let old_v = v.clone();
+                        ui.text_edit_singleline(v);
+                        if old_v != *v {
+                            mesh_changed = true;
+                        }
+                    });
+                }
+                ui.label("Axiom:");
+                let mut new_axiom = self.lsys.rules.axiom.clone().iter().collect::<String>();
+                ui.text_edit_singleline(&mut new_axiom);
+                if new_axiom != self.lsys.rules.axiom.iter().collect::<String>() {
+                    self.lsys.rules.axiom = new_axiom.chars().collect();
                     mesh_changed = true;
                 }
-            });
-        }
-        ui.label("Axiom:");
-        let mut new_axiom = self.lsys.rules.axiom.clone().iter().collect::<String>();
-        ui.text_edit_singleline(&mut new_axiom);
-        if new_axiom != self.lsys.rules.axiom.iter().collect::<String>() {
-            self.lsys.rules.axiom = new_axiom.chars().collect();
-            mesh_changed = true;
-        }
 
-        ui.label("Name");
-        let mut new_name = self.lsys.name.clone();
-        ui.text_edit_singleline(&mut new_name);
-        if new_name != self.lsys.name {
-            self.lsys.name = new_name;
-        }
-        if ui.button("Save configuration").clicked() {
-            let _ = save_load::serialize_to_file(&self, &self.lsys.name.clone());
-        }
-        if ui.button("Load configuration").clicked() {
-            let loaded: FractalPlant = save_load::deserialize_from_file(&self.lsys.name.clone())
-                .unwrap_or(FractalPlant::default());
+                ui.label("Name");
+                let mut new_name = self.lsys.name.clone();
+                ui.text_edit_singleline(&mut new_name);
+                if new_name != self.lsys.name {
+                    self.lsys.name = new_name;
+                }
+                if ui.button("Save configuration").clicked() {
+                    let _ = save_load::serialize_to_file(&self, &self.lsys.name.clone());
+                }
+                if ui.button("Load configuration").clicked() {
+                    let loaded: FractalPlant =
+                        save_load::deserialize_from_file(&self.lsys.name.clone())
+                            .unwrap_or(FractalPlant::default());
 
-            self.start_pos = loaded.start_pos;
-            self.start_angle = loaded.start_angle;
-            self.turn_angle = loaded.turn_angle;
-            self.line_length = loaded.line_length;
-            self.branch_color = loaded.branch_color;
-            self.lsys = loaded.lsys;
-            mat_changed = true;
-        }
+                    self.start_pos = loaded.start_pos;
+                    self.start_angle = loaded.start_angle;
+                    self.turn_angle = loaded.turn_angle;
+                    self.line_length = loaded.line_length;
+                    self.branch_color = loaded.branch_color;
+                    self.lsys = loaded.lsys;
+                    mat_changed = true;
+                }
 
-        if old_length != self.line_length || old_iterations != self.lsys.iterations {
-            mesh_changed = true;
-        }
+                if old_length != self.line_length || old_iterations != self.lsys.iterations {
+                    mesh_changed = true;
+                }
 
-        if mesh_changed {
-            plant_event_writer.send(FractalPlantUpdateEvent::MESH(entity_id));
-        }
-        if mat_changed {
-            plant_event_writer.send(FractalPlantUpdateEvent::MATERIAL(entity_id));
+                if mesh_changed {
+                    plant_event_writer.send(FractalPlantUpdateEvent::MESH(entity_id));
+                }
+                if mat_changed {
+                    plant_event_writer.send(FractalPlantUpdateEvent::MATERIAL(entity_id));
+                }
+            }
+            false => {}
         }
     }
 }

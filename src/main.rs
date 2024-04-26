@@ -23,8 +23,12 @@ fn main() {
     App::new()
         .add_plugins((DefaultPlugins, MaterialPlugin::<LineMaterial>::default()))
         //.add_plugins(NoCameraPlayerPlugin)
-        .add_plugins((lsys_egui::MyEguiPlugin, player::MyPlayerPlugin))
-        .add_systems(Startup, (add_fractal_plant, load_pot))
+        .add_plugins((
+            lsys_egui::MyEguiPlugin,
+            player::MyPlayerPlugin,
+            pickup::PickupPlugin,
+        ))
+        .add_systems(Startup, add_fractal_plant)
         .add_systems(
             Update,
             (
