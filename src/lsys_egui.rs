@@ -9,7 +9,7 @@ use crate::{
     fractal_plant::FractalPlant,
     lsys_rendering::FractalPlantUpdateEvent,
     lsystems::LSysDrawer,
-    pickup::{Holder, HolderEvent, PickupDropEvent},
+    pickup::{ActiveEntityCandidate, Holder},
     player::ActiveEntity,
 };
 
@@ -37,24 +37,17 @@ pub struct PanelOccupiedScreenSpace {
     pub bottom: f32,
 }
 
-pub trait SideMenuOptions<T: Event> {
-    fn side_menu_options(
-        &mut self,
-        ui: &mut egui::Ui,
-        event_writer: &mut EventWriter<T>,
-        entity_id: Entity,
-        active_id: Entity,
-    );
+pub trait SideMenuOptions {
+    fn side_menu_options(&mut self, ui: &mut egui::Ui, id: Entity, commands: &mut Commands);
 }
 
 pub fn test_side_and_top_panel(
     mut contexts: EguiContexts,
     mut occupied_space: ResMut<PanelOccupiedScreenSpace>,
     mut query: Query<(Entity, &mut FractalPlant)>,
-    mut holder_query: Query<(Entity, &mut Holder)>,
+    mut active_candidate_query: Query<(Entity, &mut ActiveEntityCandidate)>,
     active_entity: ResMut<ActiveEntity>,
-    mut event_writer: EventWriter<FractalPlantUpdateEvent>,
-    mut holder_event_writer: EventWriter<PickupDropEvent>,
+    mut commands: Commands,
 ) {
     occupied_space.top = egui::TopBottomPanel::top("top_panel")
         .resizable(true)
@@ -71,13 +64,17 @@ pub fn test_side_and_top_panel(
             ui.label("Side Panel");
 
             for (entity, mut tree) in query.iter_mut() {
-                match active_entity.id {
-                    Some(id) => tree.side_menu_options(ui, &mut event_writer, entity, id),
-                    None => {}
+                match active_entity.id == Some(entity) {
+                    true => tree.side_menu_options(ui, entity, &mut commands),
+                    false => {}
                 }
             }
-            for (entity, mut holder) in query.iter_mut() {
-                holder.side_menu_options(ui, holder_event_writer, entity_id, active_id)
+
+            for (entity, mut obj) in active_candidate_query.iter_mut() {
+                match active_entity.id == Some(entity) {
+                    true => obj.side_menu_options(ui, entity, &mut commands),
+                    false => {}
+                }
             }
 
             ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
@@ -96,7 +93,7 @@ pub fn inspector_ui(world: &mut World) {
     };
     let mut egui_context = egui_context.clone();
 
-    egui::Window::new("UI").show(egui_context.get_mut(), |ui| {
+    egui::Window::new("DEBUG").show(egui_context.get_mut(), |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
             // equivalent to `WorldInspectorPlugin`
             bevy_inspector_egui::bevy_inspector::ui_for_world(world, ui);

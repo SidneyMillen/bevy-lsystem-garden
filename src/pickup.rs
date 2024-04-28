@@ -12,17 +12,26 @@ const PICKUP_POINT_OFFSET: f32 = 2.0;
 #[derive(Component, Debug)]
 pub struct ActiveEntityCandidate;
 
+impl SideMenuOptions for ActiveEntityCandidate {
+    fn side_menu_options(
+        &mut self,
+        ui: &mut bevy_egui::egui::Ui,
+        id: Entity,
+        commands: &mut Commands,
+    ) {
+        if ui.button("pick up").clicked() {
+            commands.entity(id).insert(HeldObject);
+        }
+        if ui.button("drop").clicked() {
+            drop_everything(commands);
+        }
+    }
+}
+
 #[derive(Component, Debug)]
 pub struct Holder {
     held: bool,
 }
-
-pub enum HolderEvent {
-    PICKUP,
-    DROP,
-}
-#[derive(Event)]
-pub struct PickupDropEvent(HolderEvent);
 
 impl Holder {
     fn hold(&mut self) {
@@ -41,34 +50,14 @@ impl Default for Holder {
     }
 }
 
-impl SideMenuOptions<PickupDropEvent> for Holder {
-    fn side_menu_options(
-        &mut self,
-        ui: &mut bevy_egui::egui::Ui,
-        event_writer: &mut EventWriter<PickupDropEvent>,
-        entity_id: Entity,
-        active_id: Entity,
-    ) {
-        match entity_id == active_id {
-            true => {
-                ui.label("Pickup/Drop");
-                if ui.button("Pickup").clicked() {
-                    event_writer.send(PickupDropEvent(HolderEvent::PICKUP));
-                }
-                if ui.button("Drop").clicked() {
-                    event_writer.send(PickupDropEvent(HolderEvent::DROP));
-                }
-            }
-            false => {}
-        }
-    }
-}
-
 #[derive(Debug, Resource, Default, Clone)]
 pub struct PlayerPickupPoint {
     pub distance: f32,
     pub global_pos: Vec3,
 }
+
+#[derive(Component)]
+pub struct HeldObject;
 
 pub struct PickupPlugin;
 
@@ -78,7 +67,7 @@ impl Plugin for PickupPlugin {
             .add_systems(Startup, setup_player_pickup_point)
             .add_systems(
                 Update,
-                (update_player_pickup_point, move_active_entity_to_hold).chain(),
+                (update_player_pickup_point, move_held_entity_to_hold).chain(),
             );
     }
 }
@@ -96,25 +85,25 @@ fn update_player_pickup_point(
         player_transform.translation + player_transform.forward().normalize() * PICKUP_POINT_OFFSET;
 }
 
-pub fn move_active_entity_to_hold(
+pub fn move_held_entity_to_hold(
     pickup_point: Res<PlayerPickupPoint>,
-    mut candidates: Query<(Entity, &mut Transform), With<ActiveEntityCandidate>>,
-    active: Res<ActiveEntity>,
-    holder: Query<&Holder>,
+    mut held: Query<&mut Transform, With<HeldObject>>,
+    mut commands: Commands,
 ) {
-    let holder = holder.get_single().unwrap();
-    if holder.held() {
-        match active.id {
-            Some(id) => {
-                for (e, mut transform) in candidates.iter_mut() {
-                    if e.eq(&id) {
-                        dbg!("pickup match: {}", e);
-                        transform.translation = pickup_point.global_pos;
-                        dbg!("pickup point: {}", pickup_point.global_pos);
-                    }
-                }
-            }
-            None => {}
-        }
+    match held.get_single_mut() {
+        Ok(mut transform) => transform.translation = pickup_point.global_pos,
+
+        //err means more than one held object, so drop everything if that happens
+        Err(_) => drop_everything(&mut commands),
     }
+}
+
+fn drop_everything(commands: &mut Commands<'_, '_>) {
+    commands.add(move |world: &mut World| {
+        let mut query = world.query_filtered::<Entity, With<HeldObject>>();
+        let mut held_ids = query.iter_mut(world).collect::<Vec<Entity>>();
+        for entity in held_ids.iter_mut() {
+            world.entity_mut(*entity).remove::<HeldObject>();
+        }
+    })
 }
