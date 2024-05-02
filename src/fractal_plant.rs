@@ -24,7 +24,7 @@ use crate::lsystems::LSysRules;
 
 use crate::lsystems::LSys;
 
-pub fn add_fractal_plant(
+pub fn add_first_fractal_plant(
     mut commands: Commands,
     mut materials: ResMut<Assets<LineMaterial>>,
     mut update_writer: EventWriter<FractalPlantUpdateEvent>,
@@ -52,6 +52,43 @@ pub fn add_fractal_plant(
     update_writer.send(FractalPlantUpdateEvent::MESH(id));
     update_writer.send(FractalPlantUpdateEvent::MATERIAL(id));
 }
+pub fn add_new_fractal_plants(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<LineMaterial>>,
+    mut update_writer: EventWriter<FractalPlantUpdateEvent>,
+    spawn_q: Query<(Entity, &PlantSpawnPoint)>,
+    assets: Res<AssetServer>,
+) {
+    for (entity, PlantSpawnPoint(pos)) in spawn_q.iter() {
+        let pot: Handle<Scene> = assets.load("pot.glb#Scene0");
+
+        let tree = FractalPlant::default();
+        let plant_mesh = LineMesh::default();
+        let plant_mesh_handle = plant_mesh.mesh_handle.clone();
+        let id = commands
+            .spawn(Transform::from_translation(pos.clone()))
+            .insert(LSysDrawer { changed: true })
+            .insert((tree))
+            .insert(ActiveEntityCandidate)
+            .insert(MaterialMeshBundle {
+                material: materials.add(LineMaterial::new(Color::rgb(1.0, 1.0, 1.0))),
+                mesh: plant_mesh_handle,
+
+                ..Default::default()
+            })
+            .insert(SceneBundle {
+                scene: pot,
+                ..default()
+            })
+            .id();
+        update_writer.send(FractalPlantUpdateEvent::MESH(id));
+        update_writer.send(FractalPlantUpdateEvent::MATERIAL(id));
+        commands.entity(entity).despawn();
+    }
+}
+
+#[derive(Component)]
+pub struct PlantSpawnPoint(pub Vec3);
 
 #[derive(Component, Serialize, Deserialize, Debug)]
 pub(crate) struct FractalPlant {

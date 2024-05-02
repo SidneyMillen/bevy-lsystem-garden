@@ -3,6 +3,7 @@ use bevy_flycam::{FlyCam, KeyBindings, MovementSettings, NoCameraPlayerPlugin};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 
 use crate::{
+    fractal_plant::PlantSpawnPoint,
     lsys_egui::PanelOccupiedScreenSpace,
     pickup::{ActiveEntityCandidate, Holder},
 };
@@ -42,9 +43,10 @@ impl Plugin for MyPlayerPlugin {
                 (
                     update_camera_transform_system,
                     seek_active_object,
-                    (process_input_for_cam, clamp_flycam_height).chain(),
+                    process_input_for_cam,
                 ),
             )
+            .add_systems(PostUpdate, clamp_flycam_height)
             .add_event::<CameraResetEvent>();
     }
 }
@@ -97,9 +99,15 @@ fn clamp_flycam_height(mut query: Query<&mut Transform, With<FlyCam>>) {
 pub fn process_input_for_cam(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut reset_events: EventWriter<CameraResetEvent>,
+    player_transform: Query<&Transform, With<PlayerCam>>,
+    mut commands: Commands,
 ) {
+    let player_transform = player_transform.get_single().unwrap();
     if keyboard_input.just_pressed(KeyCode::KeyR) {
         reset_events.send(CameraResetEvent);
+    }
+    if keyboard_input.just_pressed(KeyCode::KeyN) {
+        commands.spawn(PlantSpawnPoint(player_transform.translation));
     }
 }
 

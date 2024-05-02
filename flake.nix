@@ -9,7 +9,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     utils.url = "github:numtide/flake-utils";
     flake-compat = {
-      url = github:edolstra/flake-compat;
+      url = "github:edolstra/flake-compat";
       flake = false;
     };
   };
@@ -17,48 +17,61 @@
   outputs = { self, nixpkgs, utils, rust-overlay, ... }:
     utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
-        libPath = with pkgs; lib.makeLibraryPath [
-          libGL
-          libGLU
-          libxkbcommon
-          wayland
-          xorg.libX11
-          xorg.libXcursor
-          xorg.libXi
-          xorg.libXrandr
-           udev alsa-lib vulkan-loader
-    xorg.libX11 xorg.libXcursor xorg.libXi xorg.libXrandr # To use the x11 feature
-    libxkbcommon wayland # To use the wayland feature
-        ];
+        pkgs = import nixpkgs {
+          inherit system;
+          crossSystem = { config = "x86_64-w64-mingw32"; };
+        };
+        libPath = with pkgs;
+          lib.makeLibraryPath [
+            libGL
+            libGLU
+            libxkbcommon
+            wayland
+            xorg.libX11
+            xorg.libXcursor
+            xorg.libXi
+            xorg.libXrandr
+            udev
+            alsa-lib
+            vulkan-loader
+            xorg.libX11
+            xorg.libXcursor
+            xorg.libXi
+            xorg.libXrandr # To use the x11 feature
+            libxkbcommon
+            wayland # To use the wayland feature
+          ];
         overlays = [ rust-overlay.overlay ];
         rust = pkgs.rust-bin.beta.latest.default;
-      in
-      {
-           devShell = with pkgs; mkShell {
-          buildInputs = [
-            cargo
-            cargo-insta
-            pkg-config
-            pre-commit
-            rust-analyzer
-rustc
-            rustPackages.clippy
-            rustfmt
-            tokei
-            systemd
-            alsa-lib
-            udev
-            vulkan-loader
-            pkg-config
-            lld
-            clang
-            wayland
-            xorg.libxcb
-          ];
-          RUST_SRC_PATH = rustPlatform.rustLibSrc;
-          LD_LIBRARY_PATH = libPath;
-          GIT_EXTERNAL_DIFF = "${difftastic}/bin/difft";
-        };
+      in {
+        devShell = with pkgs;
+          mkShell {
+            buildInputs = [
+              zlib
+              cargo
+              cargo-insta
+              pkg-config
+              pre-commit
+              rust-analyzer
+              rustc
+              rustPackages.clippy
+              rustfmt
+              tokei
+              systemd
+              alsa-lib
+              udev
+              vulkan-loader
+              pkg-config
+              lld
+              clang
+              wayland
+              xorg.libxcb
+            ];
+            RUST_SRC_PATH = rustPlatform.rustLibSrc;
+            LD_LIBRARY_PATH = libPath;
+            GIT_EXTERNAL_DIFF = "${difftastic}/bin/difft";
+
+          };
+
       });
 }

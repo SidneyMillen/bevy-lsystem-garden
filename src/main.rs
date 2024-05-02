@@ -3,7 +3,7 @@ use bevy::{
     render::{mesh::PrimitiveTopology, render_asset::RenderAssetUsages},
 };
 
-use fractal_plant::add_fractal_plant;
+use fractal_plant::{add_first_fractal_plant, add_new_fractal_plants};
 use lsys_rendering::{FractalPlantUpdateEvent, LineMaterial};
 use plant_pot::load_pot;
 
@@ -28,10 +28,11 @@ fn main() {
             player::MyPlayerPlugin,
             pickup::PickupPlugin,
         ))
-        .add_systems(Startup, add_fractal_plant)
+        .add_systems(Startup, (add_first_fractal_plant))
         .add_systems(
             Update,
             (
+                add_new_fractal_plants,
                 fractal_plant::update_plant_meshes,
                 fractal_plant::update_plant_materials,
             ),
