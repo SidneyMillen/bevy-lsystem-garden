@@ -17,10 +17,7 @@
   outputs = { self, nixpkgs, utils, rust-overlay, ... }:
     utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs {
-          inherit system;
-          crossSystem = { config = "x86_64-w64-mingw32"; };
-        };
+        pkgs = import nixpkgs { inherit system; };
         libPath = with pkgs;
           lib.makeLibraryPath [
             libGL
@@ -42,7 +39,8 @@
             wayland # To use the wayland feature
           ];
         overlays = [ rust-overlay.overlay ];
-        rust = pkgs.rust-bin.beta.latest.default;
+        rust =
+          pkgs.rust-bin.stable.latest.default; # Stable rust, default profile. If not sure, always choose this.;
       in {
         devShell = with pkgs;
           mkShell {
