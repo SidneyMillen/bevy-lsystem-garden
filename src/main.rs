@@ -5,6 +5,7 @@ use bevy::{
 
 use fractal_plant::{add_first_fractal_plant, add_new_fractal_plants};
 use lsys_rendering::{FractalPlantUpdateEvent, LineMaterial};
+use pickup::FocusedObject;
 use plant_pot::load_pot;
 
 use serde::{Deserialize, Serialize};
@@ -18,6 +19,17 @@ mod pickup;
 mod plant_pot;
 mod player;
 mod save_load;
+mod states;
+
+#[derive(Resource)]
+enum GameState{
+    Default,
+    Editor(FocusedObject)
+}
+
+fn setup(mut commands: Commands){
+    commands.insert_resource(GameState::Default);
+}
 
 fn main() {
     App::new()
@@ -26,9 +38,9 @@ fn main() {
         .add_plugins((
             lsys_egui::MyEguiPlugin,
             player::MyPlayerPlugin,
-            pickup::PickupPlugin,
+            // pickup::PickupPlugin,
         ))
-        .add_systems(Startup, (add_first_fractal_plant))
+        .add_systems(Startup, (add_first_fractal_plant, setup))
         .add_systems(
             Update,
             (
