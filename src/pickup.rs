@@ -20,7 +20,7 @@ impl SideMenuOptions for ActiveEntityCandidate {
         commands: &mut Commands,
     ) {
         if ui.button("pick up").clicked() {
-            commands.entity(id).insert(HeldObject);
+            commands.entity(id).insert(FocusedObject);
         }
         if ui.button("drop").clicked() {
             drop_everything(commands);
@@ -57,7 +57,7 @@ pub struct PlayerPickupPoint {
 }
 
 #[derive(Component)]
-pub struct HeldObject;
+pub struct FocusedObject;
 
 pub struct PickupPlugin;
 
@@ -87,7 +87,7 @@ fn update_player_pickup_point(
 
 pub fn move_held_entity_to_hold(
     pickup_point: Res<PlayerPickupPoint>,
-    mut held: Query<&mut Transform, With<HeldObject>>,
+    mut held: Query<&mut Transform, With<FocusedObject>>,
     mut commands: Commands,
 ) {
     match held.get_single_mut() {
@@ -100,10 +100,10 @@ pub fn move_held_entity_to_hold(
 
 fn drop_everything(commands: &mut Commands<'_, '_>) {
     commands.add(move |world: &mut World| {
-        let mut query = world.query_filtered::<Entity, With<HeldObject>>();
+        let mut query = world.query_filtered::<Entity, With<FocusedObject>>();
         let mut held_ids = query.iter_mut(world).collect::<Vec<Entity>>();
         for entity in held_ids.iter_mut() {
-            world.entity_mut(*entity).remove::<HeldObject>();
+            world.entity_mut(*entity).remove::<FocusedObject>();
         }
     })
 }
