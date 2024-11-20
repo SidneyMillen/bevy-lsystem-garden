@@ -11,6 +11,7 @@ use crate::{
     lsystems::LSysDrawer,
     pickup::{ActiveEntityCandidate, Holder},
     player::ActiveEntity,
+    GameState,
 };
 
 pub struct MyEguiPlugin;
@@ -38,7 +39,13 @@ pub struct PanelOccupiedScreenSpace {
 }
 
 pub trait SideMenuOptions {
-    fn side_menu_options(&mut self, ui: &mut egui::Ui, id: Entity, commands: &mut Commands);
+    fn side_menu_options(
+        &mut self,
+        ui: &mut egui::Ui,
+        id: Entity,
+        commands: &mut Commands,
+        gs: &mut NextState<GameState>,
+    );
 }
 
 pub fn test_side_and_top_panel(
@@ -48,6 +55,7 @@ pub fn test_side_and_top_panel(
     mut active_candidate_query: Query<(Entity, &mut ActiveEntityCandidate)>,
     active_entity: ResMut<ActiveEntity>,
     mut commands: Commands,
+    mut gs: ResMut<NextState<GameState>>,
 ) {
     occupied_space.top = egui::TopBottomPanel::top("top_panel")
         .resizable(true)
@@ -65,14 +73,14 @@ pub fn test_side_and_top_panel(
 
             for (entity, mut tree) in query.iter_mut() {
                 match active_entity.id == Some(entity) {
-                    true => tree.side_menu_options(ui, entity, &mut commands),
+                    true => tree.side_menu_options(ui, entity, &mut commands, &mut gs),
                     false => {}
                 }
             }
 
             for (entity, mut obj) in active_candidate_query.iter_mut() {
                 match active_entity.id == Some(entity) {
-                    true => obj.side_menu_options(ui, entity, &mut commands),
+                    true => obj.side_menu_options(ui, entity, &mut commands, &mut gs),
                     false => {}
                 }
             }

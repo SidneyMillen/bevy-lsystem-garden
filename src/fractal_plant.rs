@@ -16,7 +16,7 @@ use crate::lsys_egui::SideMenuOptions;
 use crate::lsys_rendering::{FractalPlantUpdateEvent, LineMaterial};
 use crate::lsys_rendering::{GenerateLineList, LineMesh};
 use crate::pickup::ActiveEntityCandidate;
-use crate::save_load;
+use crate::{save_load, GameState};
 
 use crate::lsystems::LSysDrawer;
 
@@ -240,6 +240,7 @@ impl SideMenuOptions for FractalPlant {
         ui: &mut bevy_egui::egui::Ui,
         active_id: Entity,
         commands: &mut Commands,
+        gs: &mut NextState<GameState>,
     ) {
         let mut mat_changed = false;
         let old_length = self.line_length;

@@ -3,6 +3,8 @@ use bevy::{
     render::{mesh::PrimitiveTopology, render_asset::RenderAssetUsages},
 };
 
+use bevy_panorbit_camera::PanOrbitCameraPlugin;
+use editor::EditorPlugin;
 use fractal_plant::{add_first_fractal_plant, add_new_fractal_plants};
 use lsys_rendering::{FractalPlantUpdateEvent, LineMaterial};
 use pickup::FocusedObject;
@@ -10,37 +12,37 @@ use plant_pot::load_pot;
 
 use serde::{Deserialize, Serialize};
 
+mod editor;
 mod fractal_plant;
 mod hilbert_curve;
 mod lsys_egui;
 mod lsys_rendering;
 mod lsystems;
+mod panorbit_cam;
 mod pickup;
 mod plant_pot;
 mod player;
 mod save_load;
-mod states;
 
-#[derive(Resource)]
-enum GameState{
+#[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum GameState {
+    #[default]
     Default,
-    Editor(FocusedObject)
-}
-
-fn setup(mut commands: Commands){
-    commands.insert_resource(GameState::Default);
+    Editor,
 }
 
 fn main() {
     App::new()
+        .insert_state(GameState::Default)
         .add_plugins((DefaultPlugins, MaterialPlugin::<LineMaterial>::default()))
         //.add_plugins(NoCameraPlayerPlugin)
         .add_plugins((
             lsys_egui::MyEguiPlugin,
             player::MyPlayerPlugin,
-            // pickup::PickupPlugin,
+            EditorPlugin,
+            PanOrbitCameraPlugin, // pickup::PickupPlugin,
         ))
-        .add_systems(Startup, (add_first_fractal_plant, setup))
+        .add_systems(Startup, (add_first_fractal_plant))
         .add_systems(
             Update,
             (

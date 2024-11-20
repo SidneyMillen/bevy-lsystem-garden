@@ -6,6 +6,7 @@ use crate::{
     fractal_plant::PlantSpawnPoint,
     lsys_egui::PanelOccupiedScreenSpace,
     pickup::{ActiveEntityCandidate, Holder},
+    GameState,
 };
 
 const CAMERA_TARGET: Vec3 = Vec3::ZERO;
@@ -28,8 +29,8 @@ impl Plugin for MyPlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(NoCameraPlayerPlugin)
             .insert_resource(MovementSettings {
-                sensitivity: 0.00015, // default: 0.00012
-                speed: 6.0,           // default: 12.0
+                sensitivity: 0.0008, // default: 0.00012
+                speed: 6.0,          // default: 12.0
             })
             .insert_resource(KeyBindings {
                 move_ascend: KeyCode::KeyE,
@@ -37,41 +38,48 @@ impl Plugin for MyPlayerPlugin {
                 ..Default::default()
             })
             .insert_resource(ActiveEntity { id: None })
-            .add_systems(Startup, setup_camera)
+            .add_systems(OnEnter(GameState::Default), setup_camera)
             .add_systems(
                 Update,
                 (
                     update_camera_transform_system,
                     seek_active_object,
                     process_input_for_cam,
-                ),
+                )
+                    .run_if(in_state(GameState::Default)),
             )
-            .add_systems(PostUpdate, clamp_flycam_height)
-            .add_event::<CameraResetEvent>();
+            .add_systems(
+                PostUpdate,
+                clamp_flycam_height.run_if(in_state(GameState::Default)),
+            )
+            .add_event::<CameraResetEvent>()
+            .add_systems(OnExit(GameState::Default), exit_flycam);
     }
 }
 
-pub fn setup_camera(mut commands: Commands) {
-    let camera_pos = Vec3::new(0.0, 0.0, 5.0);
-    let camera_transform =
-        Transform::from_translation(camera_pos).looking_at(CAMERA_TARGET, Vec3::Y);
+pub fn setup_camera(mut commands: Commands, q: Query<Entity, With<PlayerCam>>) {
+    match q.get_single() {
+        Ok(entity) => {
+            commands.entity(entity).insert(FlyCam);
+            dbg!("a");
+        }
+        Err(_) => {
+            let camera_pos = Vec3::new(0.0, 0.0, 5.0);
+            let camera_transform =
+                Transform::from_translation(camera_pos).looking_at(CAMERA_TARGET, Vec3::Y);
 
-    commands.insert_resource(OriginalCameraTransform(camera_transform.clone()));
+            commands.insert_resource(OriginalCameraTransform(camera_transform.clone()));
 
-    commands
-        .spawn(Camera3dBundle {
-            transform: camera_transform,
-            ..default()
-        })
-        .insert(PanOrbitCamera {
-            button_orbit: MouseButton::Right,
-            button_pan: MouseButton::Right,
-            modifier_pan: Some(KeyCode::ShiftLeft),
-            ..Default::default()
-        })
-        .insert(FlyCam)
-        .insert(Holder::default())
-        .insert(PlayerCam);
+            commands
+                .spawn(Camera3dBundle {
+                    transform: camera_transform,
+                    ..default()
+                })
+                .insert(FlyCam)
+                .insert(Holder::default())
+                .insert(PlayerCam);
+        }
+    }
 }
 
 #[derive(Debug, Event)]
@@ -148,4 +156,8 @@ fn seek_active_object(
 
     let best_candidate = valid_candidate_distances.min_by(|x, y| x.1.total_cmp(&y.1));
     active_entity.id = best_candidate.map_or(None, |x| Some(x.0));
+}
+
+fn exit_flycam(e: Query<Entity, With<FlyCam>>, mut commands: Commands) {
+    commands.entity(e.get_single().unwrap()).remove::<FlyCam>();
 }

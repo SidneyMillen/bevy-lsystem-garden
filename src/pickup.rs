@@ -5,6 +5,7 @@ use bevy::{ecs::reflect::ReflectCommandExt, prelude::*, transform::commands};
 use crate::{
     lsys_egui::SideMenuOptions,
     player::{ActiveEntity, PlayerCam},
+    GameState,
 };
 
 const PICKUP_POINT_OFFSET: f32 = 2.0;
@@ -18,12 +19,15 @@ impl SideMenuOptions for ActiveEntityCandidate {
         ui: &mut bevy_egui::egui::Ui,
         id: Entity,
         commands: &mut Commands,
+        gs: &mut NextState<GameState>,
     ) {
-        if ui.button("pick up").clicked() {
+        if ui.button("edit").clicked() {
             commands.entity(id).insert(FocusedObject);
+            gs.set(GameState::Editor);
         }
-        if ui.button("drop").clicked() {
+        if ui.button("stop editing").clicked() {
             drop_everything(commands);
+            gs.set(GameState::Default)
         }
     }
 }
