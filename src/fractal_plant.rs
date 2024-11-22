@@ -16,6 +16,7 @@ use crate::lsys_egui::SideMenuOptions;
 use crate::lsys_rendering::{FractalPlantUpdateEvent, LineMaterial};
 use crate::lsys_rendering::{GenerateLineList, LineMesh};
 use crate::pickup::ActiveEntityCandidate;
+use crate::utils::{Counter, Level};
 use crate::{save_load, GameState};
 
 use crate::lsystems::LSysDrawer;
@@ -30,6 +31,22 @@ pub fn add_first_fractal_plant(
     mut update_writer: EventWriter<FractalPlantUpdateEvent>,
     assets: Res<AssetServer>,
 ) {
+    spawn_plant_at(
+        &assets,
+        &mut commands,
+        &mut materials,
+        &mut update_writer,
+        Vec3::splat(0.0),
+    );
+}
+
+fn spawn_plant_at(
+    assets: &Res<'_, AssetServer>,
+    mut commands: &mut Commands<'_, '_>,
+    mut materials: &mut ResMut<'_, Assets<LineMaterial>>,
+    mut update_writer: &mut EventWriter<'_, FractalPlantUpdateEvent>,
+    pos: &Vec3,
+) {
     let pot: Handle<Scene> = assets.load("pot.glb#Scene0");
 
     let tree = FractalPlant::default();
@@ -42,12 +59,14 @@ pub fn add_first_fractal_plant(
         .insert(MaterialMeshBundle {
             material: materials.add(LineMaterial::new(Color::rgb(1.0, 1.0, 1.0))),
             mesh: plant_mesh_handle,
+            transform: Transform::from_translation(*pos),
             ..Default::default()
         })
         .insert(SceneBundle {
             scene: pot,
             ..default()
         })
+        .insert((Counter(0), Level(1)))
         .id();
     update_writer.send(FractalPlantUpdateEvent::MESH(id));
     update_writer.send(FractalPlantUpdateEvent::MATERIAL(id));
@@ -60,29 +79,13 @@ pub fn add_new_fractal_plants(
     assets: Res<AssetServer>,
 ) {
     for (entity, PlantSpawnPoint(pos)) in spawn_q.iter() {
-        let pot: Handle<Scene> = assets.load("pot.glb#Scene0");
-
-        let tree = FractalPlant::default();
-        let plant_mesh = LineMesh::default();
-        let plant_mesh_handle = plant_mesh.mesh_handle.clone();
-        let id = commands
-            .spawn(Transform::from_translation(pos.clone()))
-            .insert(LSysDrawer { changed: true })
-            .insert((tree))
-            .insert(ActiveEntityCandidate)
-            .insert(MaterialMeshBundle {
-                material: materials.add(LineMaterial::new(Color::rgb(1.0, 1.0, 1.0))),
-                mesh: plant_mesh_handle,
-
-                ..Default::default()
-            })
-            .insert(SceneBundle {
-                scene: pot,
-                ..default()
-            })
-            .id();
-        update_writer.send(FractalPlantUpdateEvent::MESH(id));
-        update_writer.send(FractalPlantUpdateEvent::MATERIAL(id));
+        spawn_plant_at(
+            &assets,
+            &mut commands,
+            &mut materials,
+            &mut update_writer,
+            pos,
+        );
         commands.entity(entity).despawn();
     }
 }
@@ -137,7 +140,6 @@ impl Default for FractalPlant {
                     vec!['0'],
                     vec![('1', "11".to_string()), ('0', "1[-0]+0".to_string())],
                 ),
-                iterations: 2,
             },
             mesh_handle: Handle::<Mesh>::default(),
             material_handle: Handle::<LineMaterial>::default(),
@@ -148,15 +150,15 @@ impl Default for FractalPlant {
 }
 
 pub fn update_plant_meshes(
-    mut query: Query<(Entity, &mut FractalPlant), Changed<FractalPlant>>,
+    mut query: Query<(Entity, &mut FractalPlant, &Level, &Counter), Changed<FractalPlant>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut commands: Commands,
 ) {
-    for (entity, mut plant) in query.iter_mut() {
+    for (entity, mut plant, level, counter) in query.iter_mut() {
         let mut new_line_list = Vec::<(Vec3, Vec3)>::new();
         let start_pos = plant.start_pos;
         let mut v_pos = vec![start_pos];
-        let iterations = plant.lsys.iterations;
+        let iterations: usize = counter.0;
 
         let mut pos = start_pos;
         let mut pos_stack: Vec<Vec3> = Vec::new();
@@ -244,7 +246,6 @@ impl SideMenuOptions for FractalPlant {
     ) {
         let mut mat_changed = false;
         let old_length = self.line_length;
-        let old_iterations = self.lsys.iterations;
 
         let mut new_start_angle_deg = self.start_angle.to_degrees();
         ui.label("Fractal Tree Options");
@@ -274,13 +275,6 @@ impl SideMenuOptions for FractalPlant {
             ui.add(bevy_egui::egui::Slider::new(
                 &mut self.line_length,
                 0.0..=0.3,
-            ));
-        });
-        ui.horizontal(|ui| {
-            ui.label("Iterations");
-            ui.add(bevy_egui::egui::Slider::new(
-                &mut self.lsys.iterations,
-                0..=6,
             ));
         });
         let mut col = Color32::from_rgb(

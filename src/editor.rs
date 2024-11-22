@@ -1,11 +1,7 @@
 use bevy::prelude::*;
 use bevy_panorbit_camera::PanOrbitCamera;
 
-use crate::{
-    panorbit_cam::{PanOrbitCameraBundle, PanOrbitSettings, PanOrbitState},
-    player::PlayerCam,
-    GameState,
-};
+use crate::{player::PlayerCam, GameState};
 
 pub struct EditorPlugin;
 

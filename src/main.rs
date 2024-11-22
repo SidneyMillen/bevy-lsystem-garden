@@ -4,6 +4,7 @@ use bevy::{
 };
 
 use bevy_panorbit_camera::PanOrbitCameraPlugin;
+use cool_ball::CoolBallPlugin;
 use editor::EditorPlugin;
 use fractal_plant::{add_first_fractal_plant, add_new_fractal_plants};
 use lsys_rendering::{FractalPlantUpdateEvent, LineMaterial};
@@ -12,17 +13,19 @@ use plant_pot::load_pot;
 
 use serde::{Deserialize, Serialize};
 
+mod cool_ball;
 mod editor;
 mod fractal_plant;
 mod hilbert_curve;
 mod lsys_egui;
 mod lsys_rendering;
 mod lsystems;
-mod panorbit_cam;
 mod pickup;
 mod plant_pot;
 mod player;
 mod save_load;
+mod stochastic_plants;
+mod utils;
 
 #[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GameState {
@@ -41,6 +44,7 @@ fn main() {
             player::MyPlayerPlugin,
             EditorPlugin,
             PanOrbitCameraPlugin, // pickup::PickupPlugin,
+            CoolBallPlugin,
         ))
         .add_systems(Startup, (add_first_fractal_plant))
         .add_systems(

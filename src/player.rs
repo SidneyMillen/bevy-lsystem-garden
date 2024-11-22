@@ -29,8 +29,8 @@ impl Plugin for MyPlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(NoCameraPlayerPlugin)
             .insert_resource(MovementSettings {
-                sensitivity: 0.0008, // default: 0.00012
-                speed: 6.0,          // default: 12.0
+                sensitivity: 0.00008, // default: 0.00012
+                speed: 6.0,           // default: 12.0
             })
             .insert_resource(KeyBindings {
                 move_ascend: KeyCode::KeyE,

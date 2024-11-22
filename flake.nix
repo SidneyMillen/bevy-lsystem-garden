@@ -71,5 +71,14 @@
 
           };
 
+        hydraJobs = {
+          "test-build" = pkgs.runCommand "cargo build" { } ''
+
+            echo "building"
+            cargo build
+          '';
+        };
+
       });
+
 }

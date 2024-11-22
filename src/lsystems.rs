@@ -18,7 +18,6 @@ use crate::lsys_rendering::GenerateLineList;
 pub(crate) struct LSys {
     pub(crate) name: String,
     pub(crate) rules: LSysRules,
-    pub(crate) iterations: usize,
 }
 
 #[derive(Component, Debug, Serialize, Deserialize)]

@@ -68,7 +68,6 @@ impl Default for HilbertCurve {
                         ('D', "|CFB-F+B|FA&F^A&&FB-F+B|FC//".to_string()),
                     ],
                 ),
-                iterations: 2,
             },
             line_mesh: LineList { lines: vec![] },
             mesh_handle: Handle::<Mesh>::default(),
@@ -105,7 +104,7 @@ impl GenerateLineList for HilbertCurve {
         let mut current_left = current_heading * Quat::from_rotation_y(-PI / 2.0);
         let mut line_length = self.segment_length;
 
-        for c in self.lsys.rules.eval(&self.lsys.iterations).unwrap().chars() {
+        for c in self.lsys.rules.eval(&2).unwrap().chars() {
             match c {
                 'A' | 'B' | 'C' | 'D' | 'F' => {
                     let new_pos =
