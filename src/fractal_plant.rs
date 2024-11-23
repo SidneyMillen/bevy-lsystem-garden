@@ -36,7 +36,7 @@ pub fn add_first_fractal_plant(
         &mut commands,
         &mut materials,
         &mut update_writer,
-        Vec3::splat(0.0),
+        &Vec3::splat(0.0),
     );
 }
 
@@ -155,67 +155,105 @@ pub fn update_plant_meshes(
     mut commands: Commands,
 ) {
     for (entity, mut plant, level, counter) in query.iter_mut() {
-        let mut new_line_list = Vec::<(Vec3, Vec3)>::new();
         let start_pos = plant.start_pos;
-        let mut v_pos = vec![start_pos];
         let iterations: usize = counter.0;
 
-        let mut pos = start_pos;
-        let mut pos_stack: Vec<Vec3> = Vec::new();
-        pos_stack.push(start_pos);
         let mut heading: Quat = Quat::from_rotation_z(plant.start_angle);
-        let mut angle_stack: Vec<Quat> = Vec::new();
-        angle_stack.push(heading);
         let branch_length = plant.line_length;
 
         let evaluated_lsystem = plant.lsys.rules.eval(&iterations).unwrap_or("".to_string());
 
-        for c in evaluated_lsystem.chars() {
-            match c {
-                '1' => {
-                    let new_pos = heading.mul_vec3(Vec3::new(0.0, branch_length, 0.0)) + pos;
-                    new_line_list.push((pos, new_pos));
+        let new_line_list = lsystem_to_line_list(
+            evaluated_lsystem,
+            &start_pos,
+            heading,
+            branch_length,
+            plant.turn_angle,
+            None,
+        );
 
-                    pos = new_pos;
-                }
-                '0' => {
-                    let new_pos = heading.mul_vec3(Vec3::new(0.0, branch_length, 0.0)) + pos;
-                    new_line_list.push((pos, new_pos));
-                }
-                '[' => {
-                    pos_stack.push(pos);
-                    angle_stack.push(heading);
-                }
-                '-' => {
-                    heading *= Quat::from_rotation_z(-plant.turn_angle);
-                }
-                '+' => {
-                    heading *= Quat::from_rotation_z(plant.turn_angle);
-                }
-                '<' => {
-                    heading *= Quat::from_rotation_x(-plant.turn_angle);
-                }
-                '>' => {
-                    heading *= Quat::from_rotation_x(plant.turn_angle);
-                }
-                ']' => {
-                    pos = pos_stack.pop().unwrap_or(pos);
-                    v_pos.push(pos);
-                    heading = angle_stack.pop().unwrap_or(heading);
-                }
-                _ => {}
-            }
-        }
-
-        let handle = meshes.add(LineList {
-            lines: new_line_list,
-        });
+        let handle = meshes.add(new_line_list);
         plant.mesh_handle = handle.clone();
         commands
             .entity(entity)
             .remove::<Handle<Mesh>>()
             .remove::<bevy::render::primitives::Aabb>()
             .insert(handle.clone());
+    }
+}
+
+fn lsystem_to_line_list(
+    evaluated_lsystem: String,
+    start_pos: &Vec3,
+    mut heading: Quat,
+    branch_length: f32,
+    turn_angle: f32,
+    segment_limit: Option<u32>,
+) -> LineList {
+    let mut v_pos = vec![*start_pos];
+    let mut pos = *start_pos;
+    let mut pos_stack: Vec<Vec3> = Vec::new();
+    pos_stack.push(*start_pos);
+    let mut angle_stack: Vec<Quat> = Vec::new();
+    angle_stack.push(heading);
+    let mut line_count = 0;
+    let mut new_line_list = Vec::<(Vec3, Vec3)>::new();
+    for c in evaluated_lsystem.chars() {
+        match c {
+            '1' => {
+                let new_pos = heading.mul_vec3(Vec3::new(0.0, branch_length, 0.0)) + pos;
+                if let Some(limit) = segment_limit {
+                    if line_count < limit {
+                        new_line_list.push((pos, new_pos));
+                        line_count += 1;
+                        pos = new_pos;
+                        break;
+                    }
+                }
+                new_line_list.push((pos, new_pos));
+                line_count += 1;
+
+                pos = new_pos;
+            }
+            '0' => {
+                let new_pos = heading.mul_vec3(Vec3::new(0.0, branch_length, 0.0)) + pos;
+                if let Some(limit) = segment_limit {
+                    if line_count < limit {
+                        new_line_list.push((pos, new_pos));
+                        line_count += 1;
+                        pos = new_pos;
+                        break;
+                    }
+                }
+                new_line_list.push((pos, new_pos));
+                line_count += 1;
+            }
+            '[' => {
+                pos_stack.push(pos);
+                angle_stack.push(heading);
+            }
+            '-' => {
+                heading *= Quat::from_rotation_z(-turn_angle);
+            }
+            '+' => {
+                heading *= Quat::from_rotation_z(turn_angle);
+            }
+            '<' => {
+                heading *= Quat::from_rotation_x(-turn_angle);
+            }
+            '>' => {
+                heading *= Quat::from_rotation_x(turn_angle);
+            }
+            ']' => {
+                pos = pos_stack.pop().unwrap_or(pos);
+                v_pos.push(pos);
+                heading = angle_stack.pop().unwrap_or(heading);
+            }
+            _ => {}
+        }
+    }
+    LineList {
+        lines: new_line_list,
     }
 }
 

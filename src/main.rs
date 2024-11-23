@@ -24,7 +24,6 @@ mod pickup;
 mod plant_pot;
 mod player;
 mod save_load;
-mod stochastic_plants;
 mod utils;
 
 #[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
